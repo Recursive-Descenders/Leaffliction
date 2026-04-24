@@ -1,0 +1,33 @@
+# To require this on every PR: repository Settings -> Branches -> your
+# protected branch -> enable "Require status checks" and add the `flake8` check
+# (workflow name: Lint, job name: flake8).
+name: Lint
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: lint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flake8:
+    name: flake8
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          # Matches `.python-version` when present; keeps CI on Python 3.12.
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run flake8
+        run: uv run flake8 .

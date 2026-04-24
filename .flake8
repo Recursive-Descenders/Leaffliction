@@ -1,0 +1,17 @@
+# Scope and excludes so `flake8 .` does not walk .venv, data, or build dirs.
+[flake8]
+max-line-length = 79
+exclude =
+    .git,
+    .hg,
+    .tox,
+    .venv,
+    venv,
+    __pycache__,
+    .mypy_cache,
+    .pytest_cache,
+    .eggs,
+    *.egg,
+    build,
+    dist,
+    leaves,
