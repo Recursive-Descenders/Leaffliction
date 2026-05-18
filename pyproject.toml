@@ -27,6 +27,7 @@ pr = "predict:main"
 [dependency-groups]
 dev = [
     "flake8>=7.3.0",
+    "opencv-stubs>=0.1.3",
 ]
 
 [tool.setuptools]

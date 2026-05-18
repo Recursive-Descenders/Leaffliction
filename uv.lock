@@ -473,6 +473,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "flake8" },
+    { name = "opencv-stubs" },
 ]
 
 [package.metadata]
@@ -487,7 +488,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "flake8", specifier = ">=7.3.0" }]
+dev = [
+    { name = "flake8", specifier = ">=7.3.0" },
+    { name = "opencv-stubs", specifier = ">=0.1.3" },
+]
 
 [[package]]
 name = "locket"
@@ -816,6 +820,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/fd/55/b3b49a1b97aabcfbbd6c7326df9cb0b6fa0c0aefa8e89d500939e04aa229/opencv_python-4.13.0.92-cp37-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:620d602b8f7d8b8dab5f4b99c6eb353e78d3fb8b0f53db1bd258bb1aa001c1d5", size = 72927042, upload-time = "2026-02-05T06:59:23.389Z" },
     { url = "https://files.pythonhosted.org/packages/fb/17/de5458312bcb07ddf434d7bfcb24bb52c59635ad58c6e7c751b48949b009/opencv_python-4.13.0.92-cp37-abi3-win32.whl", hash = "sha256:372fe164a3148ac1ca51e5f3ad0541a4a276452273f503441d718fab9c5e5f59", size = 30932638, upload-time = "2026-02-05T07:02:14.98Z" },
     { url = "https://files.pythonhosted.org/packages/e9/a5/1be1516390333ff9be3a9cb648c9f33df79d5096e5884b5df71a588af463/opencv_python-4.13.0.92-cp37-abi3-win_amd64.whl", hash = "sha256:423d934c9fafb91aad38edf26efb46da91ffbc05f3f59c4b0c72e699720706f5", size = 40212062, upload-time = "2026-02-05T07:02:12.724Z" },
+]
+
+[[package]]
+name = "opencv-stubs"
+version = "0.1.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0b/f4/8cdf24683aae51ad94e443b2b8482a117d7ecf8d6663be8877ec490a73e9/opencv_stubs-0.1.3.tar.gz", hash = "sha256:25b74af6bd7903340587e0fdc7d49ced0d159b56bbc598e5a58d5f3a01549e1c", size = 376250, upload-time = "2026-02-17T12:48:51.53Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/62/8b/6041723a40fedc5092bf39a91f0daa0410ebaa09763f07385a01871309bb/opencv_stubs-0.1.3-py3-none-any.whl", hash = "sha256:37074b00ede8ec9e2e2b0e77d02277841421606520327087580309e968e45bfc", size = 365107, upload-time = "2026-02-17T12:48:50.042Z" },
 ]
 
 [[package]]

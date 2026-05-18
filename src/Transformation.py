@@ -1,15 +1,22 @@
 from pathlib import Path
+
 from transformation.gaussian_blur import gaussian_blur
+from transformation.mask import mask
 
 
 SOURCE_DIR = Path("leaves/images")
-OUTPUT_DIR = Path("outputs/transformation/gaussian_blur")
+BLUR_OUTPUT_DIR = Path("outputs/transformation/gaussian_blur")
+MASK_OUTPUT_DIR = Path("outputs/transformation/mask")
 
 
 def main() -> None:
     gaussian_blur(
         src=SOURCE_DIR,
-        dst=OUTPUT_DIR,
+        dst=BLUR_OUTPUT_DIR,
+    )
+    mask(
+        src=SOURCE_DIR,
+        dst=MASK_OUTPUT_DIR,
     )
 
 
