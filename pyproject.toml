@@ -17,6 +17,7 @@ dependencies = [
     "opencv-python",
     "pandas>=3.0.2",
     "plantcv",
+    "tqdm>=4.67.0",
 ]
 
 [project.scripts]

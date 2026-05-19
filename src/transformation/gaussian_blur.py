@@ -1,6 +1,6 @@
 from pathlib import Path
 import cv2  # type: ignore[import-not-found]
-from transformation.util import get_image_paths, make_output_path
+from transformation.util import iter_image_paths, make_output_path
 
 
 def gaussian_blur(
@@ -15,10 +15,9 @@ def gaussian_blur(
     if strength <= 0 or strength % 2 == 0:
         raise ValueError("Blur strength must be a positive odd number")
 
-    image_paths = get_image_paths(src, file)
     saved_paths: list[Path] = []
 
-    for image_path in image_paths:
+    for image_path in iter_image_paths(src, file, desc="blur"):
         image = cv2.imread(str(image_path))
         if image is None:
             print(f"Skipped unreadable image: {image_path}")

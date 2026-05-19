@@ -4,7 +4,7 @@ import numpy as np  # type: ignore[import-not-found]
 from plantcv import plantcv as pcv  # type: ignore[import-not-found]
 from transformation.mask import build_mask
 from transformation.util import (
-    get_image_paths,
+    iter_image_paths,
     largest_leaf_mask,
     make_output_path,
 )
@@ -34,10 +34,11 @@ def pseudolandmarks(
     src = Path(src)
     dst = Path(dst)
 
-    image_paths = get_image_paths(src, file)
     saved_paths: list[Path] = []
 
-    for image_path in image_paths:
+    for image_path in iter_image_paths(
+        src, file, desc="pseudolandmarks"
+    ):
         image = cv2.imread(str(image_path))
 
         if image is None:

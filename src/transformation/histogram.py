@@ -8,8 +8,9 @@ from plantcv.plantcv.visualize.histogram import (  # type: ignore
     histogram as compute_channel_histogram,
 )
 from transformation.mask import build_mask
+
 from transformation.util import (
-    get_image_paths,
+    iter_image_paths,
     largest_leaf_mask,
     make_output_path,
 )
@@ -122,10 +123,9 @@ def histogram(
     src = Path(src)
     dst = Path(dst)
 
-    image_paths = get_image_paths(src, file)
     saved_paths: list[Path] = []
 
-    for image_path in image_paths:
+    for image_path in iter_image_paths(src, file, desc="histogram"):
         image = cv2.imread(str(image_path))
 
         if image is None:
