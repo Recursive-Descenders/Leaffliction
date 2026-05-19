@@ -2,11 +2,13 @@ from pathlib import Path
 
 from transformation.gaussian_blur import gaussian_blur
 from transformation.mask import mask
+from transformation.roi import roi
 
 
 SOURCE_DIR = Path("leaves/images")
 BLUR_OUTPUT_DIR = Path("outputs/transformation/gaussian_blur")
 MASK_OUTPUT_DIR = Path("outputs/transformation/mask")
+ROI_OUTPUT_DIR = Path("outputs/transformation/roi")
 
 
 def main() -> None:
@@ -17,6 +19,10 @@ def main() -> None:
     mask(
         src=SOURCE_DIR,
         dst=MASK_OUTPUT_DIR,
+    )
+    roi(
+        src=SOURCE_DIR,
+        dst=ROI_OUTPUT_DIR,
     )
 
 

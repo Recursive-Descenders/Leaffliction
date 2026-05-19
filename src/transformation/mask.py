@@ -1,36 +1,10 @@
 from pathlib import Path
-
 import cv2  # type: ignore[import-not-found]
 import numpy as np  # type: ignore[import-not-found]
+from transformation.util import get_image_paths, make_output_path
 
 
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
-
-
-def _get_image_paths(
-    src: Path,
-    file: str | Path | None,
-) -> list[Path]:
-    if file is None:
-        if not src.is_dir():
-            raise NotADirectoryError(f"Source path is not a directory: {src}")
-        return [
-            path
-            for path in src.rglob("*")
-            if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
-        ]
-
-    image_path = Path(file)
-    if not image_path.is_absolute():
-        image_path = src / image_path
-
-    if not image_path.is_file():
-        raise FileNotFoundError(f"Image file does not exist: {image_path}")
-
-    return [image_path]
-
-
-def _build_mask(image: np.ndarray) -> np.ndarray:
+def build_mask(image: np.ndarray) -> np.ndarray:
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
     h_channel = hsv[:, :, 0]
@@ -69,7 +43,7 @@ def mask(
     src = Path(src)
     dst = Path(dst)
 
-    image_paths = _get_image_paths(src, file)
+    image_paths = get_image_paths(src, file)
     saved_paths: list[Path] = []
 
     for image_path in image_paths:
@@ -79,19 +53,11 @@ def mask(
             print(f"Skipped unreadable image: {image_path}")
             continue
 
-        mask_image = _build_mask(image)
+        mask_image = build_mask(image)
         masked_image = cv2.bitwise_and(image, image, mask=mask_image)
 
-        if file is None:
-            relative_path = image_path.relative_to(src)
-            output_path = dst / relative_path.parent
-        else:
-            output_path = dst
-
-        output_path.mkdir(parents=True, exist_ok=True)
-
-        output_file = (
-            output_path / f"{image_path.stem}_mask{image_path.suffix}"
+        output_file = make_output_path(
+            src, dst, image_path, file, "mask"
         )
         cv2.imwrite(str(output_file), masked_image)
         saved_paths.append(output_file)
