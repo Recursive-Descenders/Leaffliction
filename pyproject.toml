@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "opencv-python",
     "plantcv",
+    "tqdm>=4.67.0",
 ]
 
 [project.scripts]
