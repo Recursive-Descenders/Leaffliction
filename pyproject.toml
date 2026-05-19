@@ -13,7 +13,9 @@ dependencies = [
     "pillow>=10.0.0",
     "typer>=0.12.5",
     "pyside6>=6.11.1",
+    "altair>=5.5.0",
     "opencv-python",
+    "pandas>=3.0.2",
     "plantcv",
 ]
 
@@ -46,3 +48,10 @@ include = ["distribution*"]
 
 [tool.uv]
 link-mode = "copy"
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+extraPaths = ["src"]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"

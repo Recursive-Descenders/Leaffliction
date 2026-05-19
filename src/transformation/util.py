@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import cv2  # type: ignore[import-not-found]
+import numpy as np  # type: ignore[import-not-found]
+
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 
@@ -46,3 +49,18 @@ def make_output_path(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     return output_dir / f"{image_path.stem}_{suffix}{image_path.suffix}"
+
+
+def largest_leaf_mask(mask_image: np.ndarray) -> np.ndarray | None:
+    contours, _ = cv2.findContours(
+        mask_image,
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE,
+    )
+    if not contours:
+        return None
+
+    largest_contour = max(contours, key=cv2.contourArea)
+    leaf_mask = np.zeros_like(mask_image)
+    cv2.drawContours(leaf_mask, [largest_contour], -1, 255, -1)
+    return leaf_mask
