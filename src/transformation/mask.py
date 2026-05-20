@@ -35,6 +35,11 @@ def build_mask(image: np.ndarray) -> np.ndarray:
     return mask_image
 
 
+def apply_mask(image: np.ndarray) -> np.ndarray:
+    mask_image = build_mask(image)
+    return cv2.bitwise_and(image, image, mask=mask_image)
+
+
 def mask(
     src: str | Path,
     dst: str | Path,
@@ -52,8 +57,7 @@ def mask(
             print(f"Skipped unreadable image: {image_path}")
             continue
 
-        mask_image = build_mask(image)
-        masked_image = cv2.bitwise_and(image, image, mask=mask_image)
+        masked_image = apply_mask(image)
 
         output_file = make_output_path(
             src, dst, image_path, file, "mask"

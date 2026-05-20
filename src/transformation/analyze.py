@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import cv2  # type: ignore[import-not-found]
+import numpy as np  # type: ignore[import-not-found]
 from plantcv import plantcv as pcv  # type: ignore[import-not-found]
 
 from transformation.mask import build_mask
@@ -9,6 +10,19 @@ from transformation.util import (
     largest_leaf_mask,
     make_output_path,
 )
+
+
+def apply_analyze(image: np.ndarray) -> np.ndarray | None:
+    leaf_mask = largest_leaf_mask(build_mask(image))
+    if leaf_mask is None:
+        return None
+
+    labeled_mask, num_labels = pcv.create_labels(mask=leaf_mask)
+    return pcv.analyze.size(
+        img=image,
+        labeled_mask=labeled_mask,
+        n_labels=num_labels,
+    )
 
 
 def analyze(
@@ -28,17 +42,10 @@ def analyze(
             print(f"Skipped unreadable image: {image_path}")
             continue
 
-        leaf_mask = largest_leaf_mask(build_mask(image))
-        if leaf_mask is None:
+        analysis_image = apply_analyze(image)
+        if analysis_image is None:
             print(f"Skipped image without detected leaf: {image_path}")
             continue
-
-        labeled_mask, num_labels = pcv.create_labels(mask=leaf_mask)
-        analysis_image = pcv.analyze.size(
-            img=image,
-            labeled_mask=labeled_mask,
-            n_labels=num_labels,
-        )
 
         output_file = make_output_path(
             src, dst, image_path, file, "analyze"

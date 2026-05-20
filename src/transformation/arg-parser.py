@@ -58,7 +58,8 @@ def parse_args(argv: list[str] | None = None) -> ParsedArgs:
         type=Path,
         default=None,
         help="Destination directory for outputs "
-        f"(default: {DEFAULT_DST}/<transform>)",
+        f"(default: {DEFAULT_DST}/<transform>; "
+        "omit with a single -src image to show previews)",
     )
     parser.add_argument(
         "-all",

@@ -6,6 +6,7 @@ from transformation.gaussian_blur import gaussian_blur
 from transformation.histogram import histogram
 from transformation.mask import mask
 from transformation.pseudolandmarks import pseudolandmarks
+from transformation.preview import show_transformations
 from transformation.roi import roi
 
 _ARG_PARSER_PATH = (
@@ -51,6 +52,15 @@ def run_transformations(
     transforms: frozenset[str] | None = None,
 ) -> None:
     selected = transforms or frozenset(TRANSFORMS)
+
+    if file is not None and dst is None:
+        show_transformations(
+            src=src,
+            file=str(file),
+            transforms=selected,
+            order=tuple(TRANSFORMS),
+        )
+        return
 
     for name in TRANSFORMS:
         if name not in selected:

@@ -115,6 +115,15 @@ def _build_histogram_chart(
     )
 
 
+def build_histogram_chart(image: np.ndarray) -> alt.Chart | None:
+    leaf_mask = largest_leaf_mask(build_mask(image))
+    if leaf_mask is None:
+        return None
+
+    channels = _color_channels(image, leaf_mask)
+    return _build_histogram_chart(leaf_mask, channels)
+
+
 def histogram(
     src: str | Path,
     dst: str | Path,
@@ -132,13 +141,10 @@ def histogram(
             print(f"Skipped unreadable image: {image_path}")
             continue
 
-        leaf_mask = largest_leaf_mask(build_mask(image))
-        if leaf_mask is None:
+        chart = build_histogram_chart(image)
+        if chart is None:
             print(f"Skipped image without detected leaf: {image_path}")
             continue
-
-        channels = _color_channels(image, leaf_mask)
-        chart = _build_histogram_chart(leaf_mask, channels)
 
         output_file = make_output_path(
             src, dst, image_path, file, "histogram"
