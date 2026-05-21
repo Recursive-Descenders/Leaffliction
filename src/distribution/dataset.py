@@ -33,7 +33,8 @@ def analyze_dataset(root_directory: str) -> dict[str, int]:
     Analyze the dataset structure and count images in each subdirectory.
 
     Args:
-        root_directory: Path to the root directory containing disease subdirectories
+        root_directory: Path to the root directory containing disease
+                        subdirectories
 
     Returns:
         Dictionary with disease names as keys and image counts as values

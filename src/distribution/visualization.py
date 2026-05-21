@@ -26,7 +26,9 @@ def create_visualizations(
     counts = list(disease_counts.values())
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
-    fig.suptitle(f"{plant_type} class distribution", fontsize=14, fontweight="bold")
+    fig.suptitle(f"{plant_type} class distribution",
+                 fontsize=14,
+                 fontweight="bold")
 
     colors = plt.cm.Set3(range(len(diseases)))
     _, _, autotexts = ax1.pie(
@@ -43,7 +45,9 @@ def create_visualizations(
         autotext.set_fontweight("bold")
         autotext.set_fontsize(9)
 
-    bars = ax2.bar(diseases, counts, color=colors, edgecolor="black", linewidth=1.2)
+    bars = ax2.bar(
+        diseases, counts, color=colors, edgecolor="black", linewidth=1.2
+    )
     ax2.set_title("Count", fontweight="bold")
     ax2.set_ylabel("Number of Images", fontweight="bold")
     ax2.set_xlabel("Disease Type", fontweight="bold")

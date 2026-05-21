@@ -30,7 +30,8 @@ def run(
         file_okay=False,
         dir_okay=True,
         resolve_path=True,
-        help="Directory where the visualization should be saved (default: outputs/distribution).",
+        help="Directory where the visualization should be saved "
+        "(default: outputs/distribution).",
     ),
 ) -> None:
     """Analyze a dataset and visualize the class distribution."""
@@ -42,7 +43,8 @@ def run(
 
     disease_counts = analyze_dataset(str(directory_path))
     print_statistics(disease_counts)
-    create_visualizations(disease_counts, plant_type, target_dir if save else None)
+    create_visualizations(disease_counts, plant_type,
+                          target_dir if save else None)
 
 
 def main() -> None:
