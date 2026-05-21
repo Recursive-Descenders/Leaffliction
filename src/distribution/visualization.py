@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Dict
 
 import matplotlib.pyplot as plt
 
 
-def create_visualizations(disease_counts: Dict[str, int], plant_type: str) -> None:
+def create_visualizations(
+    disease_counts: Dict[str, int],
+    plant_type: str,
+    output_dir: Path | None = None,
+) -> Path | None:
     """
     Create pie chart and bar chart for the disease distribution.
 
@@ -15,7 +20,7 @@ def create_visualizations(disease_counts: Dict[str, int], plant_type: str) -> No
     """
     if not disease_counts:
         print("No data to visualize.")
-        return
+        return None
 
     diseases = list(disease_counts.keys())
     counts = list(disease_counts.values())
@@ -58,7 +63,18 @@ def create_visualizations(disease_counts: Dict[str, int], plant_type: str) -> No
     plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45, ha="right")
 
     plt.tight_layout()
-    plt.show()
+
+    output_path: Path | None = None
+    if output_dir is not None:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / f"{plant_type}_class_distribution.png"
+        fig.savefig(output_path, bbox_inches="tight")
+        print(f"Saved visualization to {output_path}")
+    else:
+        plt.show()
+
+    plt.close(fig)
+    return output_path
 
 
 def print_statistics(disease_counts: Dict[str, int]) -> None:
