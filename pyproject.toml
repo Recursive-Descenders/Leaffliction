@@ -35,5 +35,9 @@ py-modules = [
     "predict",
 ]
 
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["distribution*"]
+
 [tool.uv]
 link-mode = "copy"
