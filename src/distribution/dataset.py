@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,12 +13,10 @@ class DatasetSummary:
 
 
 def get_image_extensions() -> tuple[str, ...]:
-    """Return supported image extensions."""
     return IMAGE_EXTENSIONS
 
 
 def count_images_in_directory(directory: Path) -> int:
-    """Count images in a directory."""
     count = 0
     for file in directory.iterdir():
         if file.is_file() and file.suffix.lower() in get_image_extensions():
@@ -29,16 +25,6 @@ def count_images_in_directory(directory: Path) -> int:
 
 
 def analyze_dataset(root_directory: str) -> dict[str, int]:
-    """
-    Analyze the dataset structure and count images in each subdirectory.
-
-    Args:
-        root_directory: Path to the root directory containing disease
-                        subdirectories
-
-    Returns:
-        Dictionary with disease names as keys and image counts as values
-    """
     root_path = Path(root_directory)
 
     if not root_path.exists() or not root_path.is_dir():

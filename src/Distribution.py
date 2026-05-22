@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pathlib import Path
 
 import typer
@@ -34,7 +32,6 @@ def run(
         "(default: outputs/distribution).",
     ),
 ) -> None:
-    """Analyze a dataset and visualize the class distribution."""
     plant_type = directory_path.name
 
     target_dir = output_dir if save else None

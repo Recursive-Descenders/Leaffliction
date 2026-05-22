@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Dict
 
@@ -11,13 +9,6 @@ def create_visualizations(
     plant_type: str,
     output_dir: Path | None = None,
 ) -> Path | None:
-    """
-    Create pie chart and bar chart for the disease distribution.
-
-    Args:
-        disease_counts: Dictionary with disease names and image counts
-        plant_type: Name of the plant type (for chart titles)
-    """
     if not disease_counts:
         print("No data to visualize.")
         return None
@@ -82,7 +73,6 @@ def create_visualizations(
 
 
 def print_statistics(disease_counts: Dict[str, int]) -> None:
-    """Print statistics about the dataset."""
     total_images = sum(disease_counts.values())
     print("\n" + "=" * 60)
     print(f"{'Disease Type':<30} {'Count':>10} {'Percentage':>10}")
