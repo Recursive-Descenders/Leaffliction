@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leaf Dataset Browser</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #eef2e8;
+      --panel: rgba(255, 255, 255, 0.88);
+      --panel-strong: #ffffff;
+      --border: rgba(33, 54, 33, 0.12);
+      --text: #1d2b1f;
+      --muted: #5d6f60;
+      --accent: #2d6a4f;
+      --accent-strong: #1f513b;
+      --accent-soft: rgba(45, 106, 79, 0.11);
+      --shadow: 0 18px 48px rgba(41, 69, 45, 0.12);
+      --radius: 18px;
+      --radius-sm: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(157, 201, 126, 0.28), transparent 26%),
+        radial-gradient(circle at top right, rgba(245, 200, 113, 0.2), transparent 24%),
+        linear-gradient(180deg, #f4f7ef 0%, #e7efe0 100%);
+      min-height: 100vh;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 22px;
+      padding: 22px;
+      min-height: 100vh;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 22px;
+      align-self: start;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      padding: 22px;
+      max-height: calc(100vh - 44px);
+      overflow: hidden;
+    }
+
+    .sidebar h1 {
+      margin: 0;
+      font-size: 1.55rem;
+      line-height: 1.1;
+    }
+
+    .lede,
+    .small-note,
+    .status-line {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .file-picker {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 12px 16px;
+      border: 0;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent) 0%, #427d5e 100%);
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 120ms ease, box-shadow 120ms ease;
+      box-shadow: 0 10px 24px rgba(45, 106, 79, 0.24);
+    }
+
+    .file-picker:hover,
+    .file-picker:focus-visible {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 28px rgba(45, 106, 79, 0.28);
+    }
+
+    .file-picker input {
+      display: none;
+    }
+
+    .stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    .control-group {
+      display: grid;
+      gap: 8px;
+    }
+
+    .control-group label {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .control,
+    .filter-button,
+    .load-more,
+    .sample-button,
+    .thumb-button,
+    .close-button {
+      border-radius: var(--radius-sm);
+    }
+
+    .control {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.92);
+      padding: 11px 12px;
+      color: var(--text);
+    }
+
+    .filter-button,
+    .load-more,
+    .sample-button,
+    .thumb-button,
+    .close-button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .filter-button,
+    .load-more,
+    .sample-button {
+      padding: 10px 14px;
+      background: rgba(32, 58, 39, 0.07);
+      color: var(--text);
+      transition: background 120ms ease, transform 120ms ease;
+    }
+
+    .filter-button:hover,
+    .load-more:hover,
+    .sample-button:hover,
+    .filter-button:focus-visible,
+    .load-more:focus-visible,
+    .sample-button:focus-visible {
+      background: rgba(32, 58, 39, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .filter-button[disabled],
+    .load-more[disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .class-list {
+      display: grid;
+      gap: 10px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .class-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid transparent;
+      background: rgba(255, 255, 255, 0.72);
+      cursor: pointer;
+      text-align: left;
+      transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+    }
+
+    .class-row:hover,
+    .class-row:focus-visible {
+      transform: translateY(-1px);
+      border-color: rgba(45, 106, 79, 0.25);
+      background: rgba(255, 255, 255, 0.96);
+    }
+
+    .class-row.active {
+      border-color: rgba(45, 106, 79, 0.42);
+      background: var(--accent-soft);
+    }
+
+    .class-name {
+      font-weight: 600;
+      word-break: break-word;
+    }
+
+    .class-count {
+      font-size: 0.84rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .content {
+      display: grid;
+      gap: 18px;
+      align-content: start;
+    }
+
+    .hero {
+      padding: 24px;
+      overflow: hidden;
+    }
+
+    .hero-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 18px;
+    }
+
+    .hero-copy h2 {
+      margin: 0 0 8px;
+      font-size: 1.8rem;
+    }
+
+    .hero-copy p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 70ch;
+      line-height: 1.5;
+    }
+
+    .hero-badge {
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.74);
+      color: var(--accent-strong);
+      font-weight: 700;
+      white-space: nowrap;
+      border: 1px solid rgba(45, 106, 79, 0.12);
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .summary-card {
+      padding: 16px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.75);
+      border: 1px solid rgba(32, 58, 39, 0.08);
+    }
+
+    .summary-card h3 {
+      margin: 0 0 8px;
+      font-size: 0.9rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .summary-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .summary-detail {
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.4;
+    }
+
+    .toolbar {
+      padding: 18px 20px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(180px, 220px) minmax(180px, 220px) auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+    }
+
+    .class-card {
+      padding: 18px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(32, 58, 39, 0.08);
+      border-radius: 18px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .class-card h3 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+
+    .class-card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 0.92rem;
+    }
+
+    .class-card .numbers {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .gallery-panel {
+      padding: 18px 20px 22px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .gallery-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .gallery-header h3 {
+      margin: 0;
+    }
+
+    .gallery-meta {
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 12px;
+    }
+
+    .thumb-button {
+      padding: 0;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.84);
+      border: 1px solid rgba(32, 58, 39, 0.08);
+      text-align: left;
+      display: grid;
+      grid-template-rows: 150px auto;
+      min-height: 100%;
+      transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+    }
+
+    .thumb-button:hover,
+    .thumb-button:focus-visible {
+      transform: translateY(-2px);
+      border-color: rgba(45, 106, 79, 0.26);
+      box-shadow: 0 12px 26px rgba(41, 69, 45, 0.1);
+    }
+
+    .thumb-button img {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      background: linear-gradient(135deg, rgba(45, 106, 79, 0.12), rgba(245, 200, 113, 0.12));
+    }
+
+    .thumb-copy {
+      padding: 10px;
+      display: grid;
+      gap: 4px;
+    }
+
+    .thumb-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .thumb-meta {
+      font-size: 0.82rem;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .empty-state {
+      padding: 40px 24px;
+      border-radius: 18px;
+      text-align: center;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px dashed rgba(32, 58, 39, 0.18);
+    }
+
+    .load-more-wrap {
+      display: flex;
+      justify-content: center;
+    }
+
+    .modal[hidden] {
+      display: none;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      padding: 24px;
+      background: rgba(19, 26, 20, 0.68);
+      display: grid;
+      place-items: center;
+      z-index: 10;
+    }
+
+    .modal-card {
+      width: min(1100px, 100%);
+      max-height: calc(100vh - 48px);
+      overflow: auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.9fr);
+      gap: 0;
+      background: var(--panel-strong);
+      border-radius: 24px;
+      box-shadow: 0 20px 80px rgba(0, 0, 0, 0.26);
+      position: relative;
+    }
+
+    .modal-visual {
+      background: #f5f6f2;
+      min-height: 360px;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+    }
+
+    .modal-visual img {
+      max-width: 100%;
+      max-height: calc(100vh - 84px);
+      object-fit: contain;
+      border-radius: 14px;
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    .modal-copy {
+      padding: 28px 24px 24px;
+      display: grid;
+      align-content: start;
+      gap: 14px;
+    }
+
+    .modal-copy h3 {
+      margin: 0;
+      font-size: 1.35rem;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+
+    .modal-nav {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .modal-nav-status {
+      color: var(--muted);
+      font-size: 0.92rem;
+      margin-left: auto;
+    }
+
+    .meta-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .meta-item {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(32, 58, 39, 0.06);
+    }
+
+    .meta-label {
+      display: block;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .meta-value {
+      word-break: break-word;
+      line-height: 1.45;
+    }
+
+    .close-button {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 38px;
+      height: 38px;
+      background: rgba(23, 34, 26, 0.74);
+      color: #fff;
+      font-size: 1.25rem;
+    }
+
+    @media (max-width: 1100px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
+        max-height: none;
+      }
+
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .toolbar {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .app-shell {
+        padding: 14px;
+      }
+
+      .hero-top {
+        flex-direction: column;
+      }
+
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .modal {
+        padding: 12px;
+      }
+
+      .modal-card {
+        grid-template-columns: 1fr;
+      }
+
+      .gallery-grid {
+        grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="panel sidebar">
+      <div class="stack">
+        <div>
+          <h1>Leaf Dataset Browser</h1>
+          <p class="lede">Choose the local <code>images/</code> folder to browse classes, sample images, and quick per-class stats without any backend.</p>
+        </div>
+
+        <label class="file-picker">
+          <input id="folderInput" type="file" webkitdirectory multiple>
+          Choose images folder
+        </label>
+
+        <p id="selectionStatus" class="status-line">No folder loaded yet.</p>
+      </div>
+
+      <div class="stack">
+        <div class="control-group">
+          <label for="classSearch">Search classes</label>
+          <input id="classSearch" class="control" type="search" placeholder="Apple, Grape, healthy...">
+        </div>
+
+        <div class="control-group">
+          <label for="classSort">Sort classes</label>
+          <select id="classSort" class="control">
+            <option value="name-asc">Name A-Z</option>
+            <option value="name-desc">Name Z-A</option>
+            <option value="count-desc">Most images</option>
+            <option value="count-asc">Fewest images</option>
+          </select>
+        </div>
+
+        <button id="clearFilter" class="filter-button" type="button" disabled>Show all classes</button>
+        <p id="sideNotes" class="small-note">Root-level files and unsupported images are ignored and reported here after a scan.</p>
+      </div>
+
+      <div id="classList" class="class-list" aria-live="polite"></div>
+    </aside>
+
+    <main class="content">
+      <section class="panel hero">
+        <div class="hero-top">
+          <div class="hero-copy">
+            <h2>Inspect class balance and spot-check your dataset</h2>
+            <p>The page scans folder names into classes, renders a lazy-loaded gallery, and measures images in the background so you can start browsing immediately.</p>
+        </div>
+        <div id="heroBadge" class="hero-badge">Waiting for folder</div>
+    </div>
+
+    <div id="summaryGrid" class="summary-grid"></div>
+</section>
+
+<section id="classStats" class="stats-grid"></section>
+
+<section class="panel toolbar">
+        <div class="control-group">
+          <label for="imageSearch">Filter visible images</label>
+          <input id="imageSearch" class="control" type="search" placeholder="Search by filename or class...">
+        </div>
+
+        <div class="control-group">
+          <label for="galleryLimit">Items per page</label>
+          <select id="galleryLimit" class="control">
+            <option value="60">60</option>
+            <option value="120" selected>120</option>
+            <option value="240">240</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="imageOrder">Image order</label>
+          <select id="imageOrder" class="control">
+            <option value="name" selected>Filename order</option>
+            <option value="random">Random order</option>
+          </select>
+        </div>
+
+        <div class="toolbar-actions">
+          <button id="reshuffleOrder" class="filter-button" type="button" disabled>Scramble gallery</button>
+          <button id="shuffleVisible" class="filter-button" type="button" disabled>Open random visible image</button>
+        </div>
+      </section>
+
+
+      <section class="panel gallery-panel">
+        <div class="gallery-header">
+          <div>
+            <h3>Gallery</h3>
+            <div id="galleryMeta" class="gallery-meta">Select a folder to begin.</div>
+          </div>
+        </div>
+
+        <div id="galleryGrid" class="gallery-grid"></div>
+
+        <div id="galleryEmpty" class="empty-state">
+          Choose the <code>images/</code> directory to populate the gallery.
+        </div>
+
+        <div id="loadMoreWrap" class="load-more-wrap">
+          <button id="loadMore" class="load-more" type="button" hidden>Load more</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="previewModal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button id="modalClose" class="close-button" type="button" aria-label="Close preview">&times;</button>
+      <div class="modal-visual">
+        <img id="modalImage" alt="">
+      </div>
+      <div class="modal-copy">
+        <h3 id="modalTitle">Preview</h3>
+        <div class="modal-nav">
+          <button id="modalPrev" class="filter-button" type="button">Previous</button>
+          <button id="modalNext" class="filter-button" type="button">Next</button>
+          <span id="modalNavStatus" class="modal-nav-status"></span>
+        </div>
+        <div id="modalMeta" class="meta-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+    const elements = {
+      folderInput: document.getElementById("folderInput"),
+      classSearch: document.getElementById("classSearch"),
+      classSort: document.getElementById("classSort"),
+      imageSearch: document.getElementById("imageSearch"),
+      galleryLimit: document.getElementById("galleryLimit"),
+      imageOrder: document.getElementById("imageOrder"),
+      selectionStatus: document.getElementById("selectionStatus"),
+      sideNotes: document.getElementById("sideNotes"),
+      heroBadge: document.getElementById("heroBadge"),
+      summaryGrid: document.getElementById("summaryGrid"),
+      classList: document.getElementById("classList"),
+      clearFilter: document.getElementById("clearFilter"),
+      classStats: document.getElementById("classStats"),
+      galleryMeta: document.getElementById("galleryMeta"),
+      galleryGrid: document.getElementById("galleryGrid"),
+      galleryEmpty: document.getElementById("galleryEmpty"),
+      loadMoreWrap: document.getElementById("loadMoreWrap"),
+      loadMore: document.getElementById("loadMore"),
+      reshuffleOrder: document.getElementById("reshuffleOrder"),
+      shuffleVisible: document.getElementById("shuffleVisible"),
+      previewModal: document.getElementById("previewModal"),
+      modalClose: document.getElementById("modalClose"),
+      modalImage: document.getElementById("modalImage"),
+      modalTitle: document.getElementById("modalTitle"),
+      modalPrev: document.getElementById("modalPrev"),
+      modalNext: document.getElementById("modalNext"),
+      modalNavStatus: document.getElementById("modalNavStatus"),
+      modalMeta: document.getElementById("modalMeta"),
+    };
+
+    const state = {
+      allImages: [],
+      classes: new Map(),
+      selectedClass: null,
+      classSearch: "",
+      imageSearch: "",
+      imageOrder: "name",
+      classSort: "name-asc",
+      visibleLimit: Number(elements.galleryLimit.value),
+      pageSize: Number(elements.galleryLimit.value),
+      folderName: "",
+      skippedRootFiles: [],
+      unsupportedFiles: [],
+      objectUrls: [],
+      scanToken: 0,
+      measuredCount: 0,
+      refreshScheduled: false,
+      activeImageId: null,
+    };
+
+    function createClassStats() {
+      return {
+        measured: 0,
+        landscape: 0,
+        portrait: 0,
+        square: 0,
+        totalWidth: 0,
+        totalHeight: 0,
+        minWidth: null,
+        maxWidth: null,
+        minHeight: null,
+        maxHeight: null,
+        failed: 0,
+      };
+    }
+
+    function createClassEntry(name) {
+      return {
+        name,
+        images: [],
+        stats: createClassStats(),
+      };
+    }
+
+    function formatNumber(value) {
+      return new Intl.NumberFormat().format(value);
+    }
+
+    function formatAverage(value, total) {
+      if (!total) {
+        return "n/a";
+      }
+      return `${Math.round(value / total)} px`;
+    }
+
+    function formatRange(min, max) {
+      if (min == null || max == null) {
+        return "n/a";
+      }
+      return `${min} - ${max} px`;
+    }
+
+    function formatFileSize(bytes) {
+      if (!Number.isFinite(bytes)) {
+        return "n/a";
+      }
+      const units = ["B", "KB", "MB", "GB"];
+      let unitIndex = 0;
+      let size = bytes;
+      while (size >= 1024 && unitIndex < units.length - 1) {
+        size /= 1024;
+        unitIndex += 1;
+      }
+      return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+    }
+
+    function normalize(text) {
+      return text.trim().toLowerCase();
+    }
+
+    function isSupportedImageFile(file) {
+      if ((file.type || "").startsWith("image/")) {
+        return true;
+      }
+      return /\.(avif|bmp|gif|jpe?g|png|svg|tiff?|webp)$/i.test(file.name);
+    }
+
+    function resetState() {
+      state.scanToken += 1;
+      state.objectUrls.forEach((url) => URL.revokeObjectURL(url));
+      state.allImages = [];
+      state.classes = new Map();
+      state.selectedClass = null;
+      state.folderName = "";
+      state.skippedRootFiles = [];
+      state.unsupportedFiles = [];
+      state.objectUrls = [];
+      state.measuredCount = 0;
+      state.activeImageId = null;
+      closeModal();
+    }
+
+    function getSortedClasses() {
+      const query = normalize(state.classSearch);
+      const entries = Array.from(state.classes.values()).filter((entry) => {
+        if (!query) {
+          return true;
+        }
+        return entry.name.toLowerCase().includes(query);
+      });
+
+      entries.sort((a, b) => {
+        if (state.classSort === "count-desc") {
+          return b.images.length - a.images.length || collator.compare(a.name, b.name);
+        }
+        if (state.classSort === "count-asc") {
+          return a.images.length - b.images.length || collator.compare(a.name, b.name);
+        }
+        if (state.classSort === "name-desc") {
+          return collator.compare(b.name, a.name);
+        }
+        return collator.compare(a.name, b.name);
+      });
+
+      if (state.selectedClass) {
+        const selectedEntry = state.classes.get(state.selectedClass);
+        if (selectedEntry && !entries.includes(selectedEntry)) {
+          entries.unshift(selectedEntry);
+        }
+      }
+
+      return entries;
+    }
+
+    function compareImagesByName(a, b) {
+      const classCompare = collator.compare(a.className, b.className);
+      if (classCompare !== 0) {
+        return classCompare;
+      }
+      return collator.compare(a.relativeInClass, b.relativeInClass);
+    }
+
+    function orderImages(images) {
+      const ordered = [...images];
+
+      if (state.imageOrder === "random") {
+        ordered.sort((a, b) => {
+          const rankDifference = (a.randomKey ?? 0) - (b.randomKey ?? 0);
+          if (rankDifference !== 0) {
+            return rankDifference;
+          }
+          return compareImagesByName(a, b);
+        });
+        return ordered;
+      }
+
+      ordered.sort(compareImagesByName);
+      return ordered;
+    }
+
+    function getVisibleImages() {
+      const imageQuery = normalize(state.imageSearch);
+      const visibleClasses = getSortedClasses();
+      const visibleClassNames = new Set(visibleClasses.map((entry) => entry.name));
+
+      const filteredImages = state.allImages.filter((image) => {
+        if (state.selectedClass && image.className !== state.selectedClass) {
+          return false;
+        }
+        if (!state.selectedClass && !visibleClassNames.has(image.className)) {
+          return false;
+        }
+        if (!imageQuery) {
+          return true;
+        }
+        return (
+          image.name.toLowerCase().includes(imageQuery) ||
+          image.className.toLowerCase().includes(imageQuery) ||
+          image.relativeInClass.toLowerCase().includes(imageQuery)
+        );
+      });
+
+      return orderImages(filteredImages);
+    }
+
+    function scheduleRefresh() {
+      if (state.refreshScheduled) {
+        return;
+      }
+      state.refreshScheduled = true;
+      requestAnimationFrame(() => {
+        state.refreshScheduled = false;
+        render();
+      });
+    }
+
+    function renderSummary() {
+      const totalClasses = state.classes.size;
+      const totalImages = state.allImages.length;
+      const visibleImages = getVisibleImages().length;
+      const ignoredCount = state.skippedRootFiles.length + state.unsupportedFiles.length;
+      const progress = totalImages ? `${formatNumber(state.measuredCount)} / ${formatNumber(totalImages)}` : "0 / 0";
+
+      const cards = [
+        {
+          title: "Classes",
+          value: formatNumber(totalClasses),
+          detail: state.selectedClass ? `Focused on ${state.selectedClass}` : "Detected from first-level subfolders",
+        },
+        {
+          title: "Images",
+          value: formatNumber(totalImages),
+          detail: `${formatNumber(visibleImages)} visible with current filters`,
+        },
+        {
+          title: "Measured",
+          value: progress,
+          detail: totalImages ? "Dimensions and orientations update in the background" : "Load a folder to start scanning",
+        },
+        {
+          title: "Ignored",
+          value: formatNumber(ignoredCount),
+          detail: `${state.skippedRootFiles.length} root-level, ${state.unsupportedFiles.length} unsupported`,
+        },
+      ];
+
+      elements.summaryGrid.innerHTML = cards.map((card) => `
+        <article class="summary-card">
+          <h3>${escapeHtml(card.title)}</h3>
+          <div class="summary-value">${escapeHtml(card.value)}</div>
+          <div class="summary-detail">${escapeHtml(card.detail)}</div>
+        </article>
+      `).join("");
+    }
+
+    function renderSidebar() {
+      const classes = getSortedClasses();
+      elements.clearFilter.disabled = !state.selectedClass;
+
+      if (!classes.length) {
+        elements.classList.innerHTML = '<div class="empty-state">No classes match the current search.</div>';
+        return;
+      }
+
+      elements.classList.innerHTML = classes.map((entry) => {
+        const isActive = state.selectedClass === entry.name;
+        return `
+          <button class="class-row ${isActive ? "active" : ""}" type="button" data-class-name="${escapeAttribute(entry.name)}">
+            <span class="class-name">${escapeHtml(entry.name)}</span>
+            <span class="class-count">${formatNumber(entry.images.length)} images</span>
+          </button>
+        `;
+      }).join("");
+    }
+
+    function renderClassCards() {
+      const classes = getSortedClasses();
+      if (!classes.length) {
+        elements.classStats.innerHTML = "";
+        return;
+      }
+
+      elements.classStats.innerHTML = classes.map((entry) => {
+        const { stats } = entry;
+        const measured = stats.measured;
+        const orientationText = measured
+          ? `${formatNumber(stats.landscape)} landscape, ${formatNumber(stats.portrait)} portrait, ${formatNumber(stats.square)} square`
+          : "Waiting for dimensions...";
+
+        const sizeText = measured
+          ? `W avg ${formatAverage(stats.totalWidth, measured)} | H avg ${formatAverage(stats.totalHeight, measured)}`
+          : "Dimension summary will appear as the scan completes.";
+
+        const rangeText = measured
+          ? `Width ${formatRange(stats.minWidth, stats.maxWidth)} | Height ${formatRange(stats.minHeight, stats.maxHeight)}`
+          : "No measured samples yet.";
+
+        return `
+          <article class="class-card">
+            <div>
+              <h3>${escapeHtml(entry.name)}</h3>
+              <p><span class="numbers">${formatNumber(entry.images.length)} images</span> in this class</p>
+            </div>
+            <p>${orientationText}</p>
+            <p>${sizeText}</p>
+            <p>${rangeText}</p>
+            <p>${measured ? `${formatNumber(measured)} / ${formatNumber(entry.images.length)} measured` : "Measurements queued in the background."}</p>
+            <button class="sample-button" type="button" data-random-class="${escapeAttribute(entry.name)}">Open random sample</button>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function renderGallery() {
+      const visibleImages = getVisibleImages();
+      const limitedImages = visibleImages.slice(0, state.visibleLimit);
+      const hiddenCount = Math.max(0, visibleImages.length - limitedImages.length);
+
+      elements.galleryMeta.textContent = state.selectedClass
+        ? `${formatNumber(visibleImages.length)} images in ${state.selectedClass}${hiddenCount ? ` • ${formatNumber(hiddenCount)} more not shown yet` : ""}`
+        : `${formatNumber(visibleImages.length)} visible images across ${formatNumber(getSortedClasses().length)} classes${hiddenCount ? ` • ${formatNumber(hiddenCount)} more not shown yet` : ""}`;
+
+      elements.reshuffleOrder.disabled = visibleImages.length === 0;
+      elements.shuffleVisible.disabled = visibleImages.length === 0;
+
+      if (!state.allImages.length) {
+        elements.galleryGrid.innerHTML = "";
+        elements.galleryEmpty.hidden = false;
+        elements.galleryEmpty.innerHTML = 'Choose the <code>images/</code> directory to populate the gallery.';
+        elements.loadMore.hidden = true;
+        return;
+      }
+
+      if (!visibleImages.length) {
+        elements.galleryGrid.innerHTML = "";
+        elements.galleryEmpty.hidden = false;
+        elements.galleryEmpty.textContent = "No images match the current filters.";
+        elements.loadMore.hidden = true;
+        return;
+      }
+
+      elements.galleryEmpty.hidden = true;
+      elements.galleryGrid.innerHTML = limitedImages.map((image) => {
+        const dimensions = image.width && image.height ? `${image.width} × ${image.height}` : "Measuring...";
+        return `
+          <button class="thumb-button" type="button" data-image-id="${image.id}">
+            <img src="${image.url}" alt="${escapeAttribute(image.name)}" loading="lazy">
+            <span class="thumb-copy">
+              <span class="thumb-name">${escapeHtml(image.name)}</span>
+              <span class="thumb-meta">${escapeHtml(image.className)} • ${escapeHtml(dimensions)}</span>
+            </span>
+          </button>
+        `;
+      }).join("");
+
+      elements.loadMore.hidden = hiddenCount === 0;
+      elements.loadMore.disabled = hiddenCount === 0;
+      elements.loadMore.textContent = hiddenCount > 0
+        ? `Load ${formatNumber(Math.min(state.pageSize, hiddenCount))} more`
+        : "All visible images loaded";
+    }
+
+    function renderStatus() {
+      if (!state.allImages.length) {
+        elements.selectionStatus.textContent = "No folder loaded yet.";
+        elements.heroBadge.textContent = "Waiting for folder";
+        elements.sideNotes.textContent = "Root-level files and unsupported images are ignored and reported here after a scan.";
+        return;
+      }
+
+      const selectionText = `${state.folderName} • ${formatNumber(state.classes.size)} classes • ${formatNumber(state.allImages.length)} images`;
+      elements.selectionStatus.textContent = selectionText;
+      elements.heroBadge.textContent = state.measuredCount < state.allImages.length
+        ? `Scanning ${formatNumber(state.measuredCount)} / ${formatNumber(state.allImages.length)}`
+        : "Scan complete";
+
+      const notes = [];
+      if (state.skippedRootFiles.length) {
+        notes.push(`${formatNumber(state.skippedRootFiles.length)} root-level file(s) ignored`);
+      }
+      if (state.unsupportedFiles.length) {
+        notes.push(`${formatNumber(state.unsupportedFiles.length)} unsupported file(s) skipped`);
+      }
+      elements.sideNotes.textContent = notes.length ? notes.join(" • ") : "All selected files fit the expected images/<class>/<file> pattern.";
+    }
+
+    function render() {
+      renderStatus();
+      renderSummary();
+      renderSidebar();
+      renderClassCards();
+      renderGallery();
+      updateModalNavigation();
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function escapeAttribute(text) {
+      return escapeHtml(text).replaceAll("'", "&#39;");
+    }
+
+    function updateClassStats(entry, width, height) {
+      const stats = entry.stats;
+      stats.measured += 1;
+      stats.totalWidth += width;
+      stats.totalHeight += height;
+      stats.minWidth = stats.minWidth == null ? width : Math.min(stats.minWidth, width);
+      stats.maxWidth = stats.maxWidth == null ? width : Math.max(stats.maxWidth, width);
+      stats.minHeight = stats.minHeight == null ? height : Math.min(stats.minHeight, height);
+      stats.maxHeight = stats.maxHeight == null ? height : Math.max(stats.maxHeight, height);
+
+      if (width > height) {
+        stats.landscape += 1;
+      } else if (height > width) {
+        stats.portrait += 1;
+      } else {
+        stats.square += 1;
+      }
+    }
+
+    function measureImage(image) {
+      return new Promise((resolve, reject) => {
+        const probe = new Image();
+        probe.onload = () => resolve({ width: probe.naturalWidth, height: probe.naturalHeight });
+        probe.onerror = reject;
+        probe.src = image.url;
+      });
+    }
+
+    async function scanDimensions(images, token) {
+      const concurrency = 4;
+      let nextIndex = 0;
+
+      async function worker() {
+        while (nextIndex < images.length && token === state.scanToken) {
+          const currentIndex = nextIndex;
+          nextIndex += 1;
+          const image = images[currentIndex];
+
+          try {
+            const { width, height } = await measureImage(image);
+            image.width = width;
+            image.height = height;
+            updateClassStats(state.classes.get(image.className), width, height);
+          } catch (error) {
+            image.width = null;
+            image.height = null;
+            state.classes.get(image.className).stats.failed += 1;
+          }
+
+          state.measuredCount += 1;
+
+          if (state.measuredCount === images.length || state.measuredCount % 24 === 0) {
+            scheduleRefresh();
+          }
+        }
+      }
+
+      await Promise.all(Array.from({ length: concurrency }, worker));
+      if (token === state.scanToken) {
+        scheduleRefresh();
+      }
+    }
+
+    function sortImages() {
+      state.allImages.sort((a, b) => {
+        const classCompare = collator.compare(a.className, b.className);
+        if (classCompare !== 0) {
+          return classCompare;
+        }
+        return collator.compare(a.relativeInClass, b.relativeInClass);
+      });
+
+      state.classes.forEach((entry) => {
+        entry.images.sort((a, b) => collator.compare(a.relativeInClass, b.relativeInClass));
+      });
+    }
+
+    function reshuffleGalleryOrder() {
+      state.allImages.forEach((image) => {
+        image.randomKey = Math.random();
+      });
+    }
+
+    function getPreviewSequence() {
+      const visibleImages = getVisibleImages();
+      if (visibleImages.some((image) => image.id === state.activeImageId)) {
+        return visibleImages;
+      }
+
+      const activeImage = state.allImages.find((image) => image.id === state.activeImageId);
+      if (!activeImage) {
+        return [];
+      }
+
+      return orderImages(state.classes.get(activeImage.className)?.images || []);
+    }
+
+    function updateModalNavigation() {
+      const previewSequence = getPreviewSequence();
+      const currentIndex = previewSequence.findIndex((image) => image.id === state.activeImageId);
+      const hasActiveImage = currentIndex !== -1;
+
+      elements.modalPrev.disabled = !hasActiveImage || currentIndex === 0;
+      elements.modalNext.disabled = !hasActiveImage || currentIndex === previewSequence.length - 1;
+
+      if (!state.activeImageId || !previewSequence.length) {
+        elements.modalNavStatus.textContent = "";
+        return;
+      }
+
+      if (!hasActiveImage) {
+        elements.modalNavStatus.textContent = "Image not in current view";
+        return;
+      }
+
+      elements.modalNavStatus.textContent = `${formatNumber(currentIndex + 1)} of ${formatNumber(previewSequence.length)}`;
+    }
+
+    function openAdjacentImage(offset) {
+      const previewSequence = getPreviewSequence();
+      const currentIndex = previewSequence.findIndex((image) => image.id === state.activeImageId);
+      if (currentIndex === -1) {
+        return;
+      }
+
+      const nextImage = previewSequence[currentIndex + offset];
+      if (nextImage) {
+        openPreview(nextImage);
+      }
+    }
+
+    function buildDataset(fileList) {
+      resetState();
+      const files = Array.from(fileList);
+      if (!files.length) {
+        render();
+        return;
+      }
+
+      const firstPath = files[0].webkitRelativePath || files[0].name;
+      state.folderName = (firstPath.split("/")[0] || "Selected folder").trim();
+
+      files.forEach((file, index) => {
+        const relativePath = file.webkitRelativePath || file.name;
+        if (!isSupportedImageFile(file)) {
+          state.unsupportedFiles.push(relativePath);
+          return;
+        }
+
+        const parts = relativePath.split("/").filter(Boolean);
+        if (parts.length < 3) {
+          state.skippedRootFiles.push(relativePath);
+          return;
+        }
+
+        const className = parts[1];
+        const relativeInClass = parts.slice(2).join("/");
+        const url = URL.createObjectURL(file);
+        state.objectUrls.push(url);
+
+        const image = {
+          id: `img-${index}`,
+          file,
+          url,
+          name: file.name,
+          className,
+          relativePath,
+          relativeInClass,
+          randomKey: Math.random(),
+          width: null,
+          height: null,
+        };
+
+        if (!state.classes.has(className)) {
+          state.classes.set(className, createClassEntry(className));
+        }
+
+        state.classes.get(className).images.push(image);
+        state.allImages.push(image);
+      });
+
+      sortImages();
+      reshuffleGalleryOrder();
+      render();
+      scanDimensions(state.allImages, state.scanToken);
+    }
+
+    function openPreview(image) {
+      if (!image) {
+        return;
+      }
+
+      state.activeImageId = image.id;
+      elements.modalImage.src = image.url;
+      elements.modalImage.alt = image.name;
+      elements.modalTitle.textContent = image.name;
+
+      const orientation = image.width && image.height
+        ? image.width > image.height
+          ? "Landscape"
+          : image.height > image.width
+            ? "Portrait"
+            : "Square"
+        : "Pending";
+
+      const meta = [
+        { label: "Class", value: image.className },
+        { label: "Relative path", value: image.relativePath },
+        { label: "Dimensions", value: image.width && image.height ? `${image.width} × ${image.height} px` : "Still measuring" },
+        { label: "Orientation", value: orientation },
+        { label: "File size", value: formatFileSize(image.file.size) },
+      ];
+
+      elements.modalMeta.innerHTML = meta.map((item) => `
+        <div class="meta-item">
+          <span class="meta-label">${item.label}</span>
+          <div class="meta-value">${escapeHtml(String(item.value))}</div>
+        </div>
+      `).join("");
+
+      elements.previewModal.hidden = false;
+      document.body.style.overflow = "hidden";
+      updateModalNavigation();
+    }
+
+    function closeModal() {
+      elements.previewModal.hidden = true;
+      document.body.style.overflow = "";
+      state.activeImageId = null;
+      updateModalNavigation();
+    }
+
+    function openRandomImage(className = null) {
+      const pool = className
+        ? (state.classes.get(className)?.images || [])
+        : getVisibleImages();
+
+      if (!pool.length) {
+        return;
+      }
+
+      const image = pool[Math.floor(Math.random() * pool.length)];
+      openPreview(image);
+    }
+
+    elements.folderInput.addEventListener("change", (event) => {
+      buildDataset(event.target.files);
+    });
+
+    elements.classSearch.addEventListener("input", (event) => {
+      state.classSearch = event.target.value;
+      state.visibleLimit = state.pageSize;
+      render();
+    });
+
+    elements.classSort.addEventListener("change", (event) => {
+      state.classSort = event.target.value;
+      render();
+    });
+
+    elements.imageSearch.addEventListener("input", (event) => {
+      state.imageSearch = event.target.value;
+      state.visibleLimit = state.pageSize;
+      render();
+    });
+
+    elements.galleryLimit.addEventListener("change", (event) => {
+      state.pageSize = Number(event.target.value);
+      state.visibleLimit = state.pageSize;
+      render();
+    });
+
+    elements.imageOrder.addEventListener("change", (event) => {
+      state.imageOrder = event.target.value;
+      state.visibleLimit = state.pageSize;
+      render();
+    });
+
+    elements.clearFilter.addEventListener("click", () => {
+      state.selectedClass = null;
+      state.visibleLimit = state.pageSize;
+      render();
+    });
+
+    elements.classList.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-class-name]");
+      if (!button) {
+        return;
+      }
+      const className = button.getAttribute("data-class-name");
+      state.selectedClass = className === state.selectedClass ? null : className;
+      state.visibleLimit = state.pageSize;
+      render();
+    });
+
+    elements.classStats.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-random-class]");
+      if (!button) {
+        return;
+      }
+      openRandomImage(button.getAttribute("data-random-class"));
+    });
+
+    elements.galleryGrid.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-image-id]");
+      if (!button) {
+        return;
+      }
+      const imageId = button.getAttribute("data-image-id");
+      const image = state.allImages.find((entry) => entry.id === imageId);
+      openPreview(image);
+    });
+
+    elements.loadMore.addEventListener("click", () => {
+      state.visibleLimit += state.pageSize;
+      render();
+    });
+
+    elements.reshuffleOrder.addEventListener("click", () => {
+      reshuffleGalleryOrder();
+      state.imageOrder = "random";
+      elements.imageOrder.value = "random";
+      state.visibleLimit = state.pageSize;
+      render();
+    });
+
+    elements.shuffleVisible.addEventListener("click", () => {
+      openRandomImage();
+    });
+
+    elements.modalPrev.addEventListener("click", () => {
+      openAdjacentImage(-1);
+    });
+
+    elements.modalNext.addEventListener("click", () => {
+      openAdjacentImage(1);
+    });
+
+    elements.modalClose.addEventListener("click", closeModal);
+    elements.previewModal.addEventListener("click", (event) => {
+      if (event.target === elements.previewModal) {
+        closeModal();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (elements.previewModal.hidden) {
+        return;
+      }
+
+      if (event.key === "Escape") {
+        closeModal();
+        return;
+      }
+
+      if (event.key === "ArrowLeft") {
+        openAdjacentImage(-1);
+        return;
+      }
+
+      if (event.key === "ArrowRight") {
+        openAdjacentImage(1);
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>
