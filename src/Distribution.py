@@ -8,13 +8,13 @@ from distribution.visualization import create_visualizations, print_statistics
 
 def run(
     directory_path: Path = typer.Argument(
-        ...,
+        Path("leaves/images"),
         exists=True,
         file_okay=False,
         dir_okay=True,
         readable=True,
         resolve_path=True,
-        help="Directory containing the dataset to analyze.",
+        help="Directory containing the dataset to analyze (default: images).",
     ),
     save: bool = typer.Option(
         False,
