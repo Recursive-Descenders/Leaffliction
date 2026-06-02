@@ -7,7 +7,13 @@ name = "leaffliction"
 version = "0.1.0"
 description = "Leaffliction — leaf image classification (42 computer vision module)"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "matplotlib>=3.8.0",
+    "numpy>=1.24.0",
+    "pillow>=10.0.0",
+    "typer>=0.12.5",
+    "pyside6>=6.11.1",
+]
 
 [project.scripts]
 dist = "Distribution:main"
@@ -30,3 +36,10 @@ py-modules = [
     "train",
     "predict",
 ]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["distribution*"]
+
+[tool.uv]
+link-mode = "copy"
