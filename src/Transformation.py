@@ -1,29 +1,16 @@
-import importlib.util
 from collections.abc import Callable
 from pathlib import Path
+
+import typer
+
 from transformation.analyze import analyze
+from transformation.cli import DEFAULT_DST, run
 from transformation.gaussian_blur import gaussian_blur
 from transformation.histogram import histogram
 from transformation.mask import mask
 from transformation.pseudolandmarks import pseudolandmarks
 from transformation.preview import show_transformations
 from transformation.roi import roi
-
-_ARG_PARSER_PATH = (
-    Path(__file__).parent / "transformation" / "arg-parser.py"
-)
-_spec = importlib.util.spec_from_file_location(
-    "transformation.arg_parser",
-    _ARG_PARSER_PATH,
-)
-if _spec is None or _spec.loader is None:
-    raise ImportError(f"Cannot load arg parser from {_ARG_PARSER_PATH}")
-
-_arg_parser = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_arg_parser)
-parse_args = _arg_parser.parse_args
-
-DEFAULT_DST = _arg_parser.DEFAULT_DST
 
 BLUR_OUTPUT_DIR = DEFAULT_DST / "gaussian_blur"
 MASK_OUTPUT_DIR = DEFAULT_DST / "mask"
@@ -76,13 +63,7 @@ def run_transformations(
 
 
 def main() -> None:
-    args = parse_args()
-    run_transformations(
-        src=args.src,
-        dst=args.dst,
-        file=args.file,
-        transforms=args.transforms,
-    )
+    typer.run(run)
 
 
 if __name__ == "__main__":
