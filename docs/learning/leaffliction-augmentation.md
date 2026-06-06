@@ -1,178 +1,345 @@
 # Learning Map — Leaffliction: Augmentation Strategy for Plant Disease Detection
-# 學習地圖 — Leaffliction:植物病害偵測的資料增強策略
 
-> Bilingual doc (EN / 中文). 雙語文件,英文在前、中文在後。
+> Knowledge record. The core is **per-method knowledge**: why each augmentation
+> method is suitable / not suitable for *this* plant-disease dataset, with the
+> supporting literature. The learning-process scaffolding (stages, mastery) is
+> kept at the end. **English full text first, 中文全文在後。**
 
-## Goal / 學習目標 (refined via grill-me, 2026-06-06)
+---
 
-**EN.** Be able to **design and defend a layered data-augmentation strategy for a
-plant disease detection dataset**, grounded in the dataset's actual
-characteristics — not just recite traditional transforms. Cover per-sample
-geometric/color/erasing, the policy layer (RandAugment family), batch-level
-label-mixing (CutMix/SnapMix), and generative synthesis — and for each, argue
-**mechanism, applicability, and risk to labels/distribution**, including **why NOT
-to use** a method here.
+# ENGLISH
 
-**中文.** 能**為一個植物病害偵測資料集,根據其真實資料特性,設計並辯護一套分層的資料增強策略**
-——而不是只會背傳統手法。涵蓋 per-sample 的幾何/色彩/抹除、策略層(RandAugment 家族)、
-batch 層的標籤混合(CutMix/SnapMix)、以及生成式合成;每個方法都要能論證**機制、適用條件、
-以及對標籤/分佈的風險**,包含**為什麼在這裡不該用**某方法。
+## 1. Goal
+Be able to **design and defend a layered data-augmentation strategy for a plant
+disease detection dataset**, grounded in the dataset's real characteristics — not
+just recite traditional transforms — arguing for each method its **mechanism,
+why it is (un)suitable here, and its risk to labels/distribution**.
 
-**One-line ability / 一句話能力:** "Given a plant-disease dataset, I can derive an
-augmentation policy from its data facts, justify every include/exclude against the
-literature, and read any new augmentation paper to triage its relevance."
-／「給我一個植物病害資料集,我能從資料事實推導出增強策略、用文獻佐證每個取捨、並讀懂任何新的
-增強論文來判斷它適不適用。」
+**One-line ability:** "Given a plant-disease dataset, I can derive an augmentation
+policy from its data facts, justify every include/exclude against the literature,
+and read any new augmentation paper to triage its relevance."
 
-## Acceptance / 驗收標準 (primary + co-equal)
+## 2. Acceptance
+- **(a) PRIMARY — a defensible strategy document** (rubric in §6).
+- **(b) CO-EQUAL — paper-reading literacy**: read a primary paper, decode its
+  math, restate the mechanism as pseudo-code.
+- NOT the goal: implementation handsiness, measured accuracy gains.
 
-- **(a) PRIMARY / 主驗收 — a defensible strategy document / 一份可辯護的策略文件** (rubric below / 見下方 rubric).
-- **(b) CO-EQUAL / 並列 — paper-reading literacy / 讀論文素養**: read a primary paper,
-  decode its math, restate the mechanism as pseudo-code.
-  讀原始論文、解開它的數學符號、用 pseudo-code 重述機制 → 逼出真正的原始來源閱讀,而非二手摘要。
-- Deliberately NOT the goal / 刻意不是目標: (c) implementation handsiness 程式手感,
-  (d) measured accuracy gains 準確率數字. (Augmentation.py is only the Part-2 anchor.)
+## 3. Dataset facts (evidence base, from Issue #4)
+These are the *premises* every method decision must cite.
+- **A3** smallest class = 275 images → NOT scarce. **A4** imbalance ~6x
+  (apple_healthy 1640 vs apple_rust 275).
+- **B1** COLOR is the main disease cue (brown spot vs green) — central constraint.
+- **B2** shape/contour NOT the main cue; missing-parts only ~10% (apple_black_rot).
+- **B3** lesions scattered across the leaf, ~10% of surface (not one tiny spot).
+- **B4** consistent top-down shooting angle (no canonical orientation).
+- **B5** low lighting variation (indoor, one light); slight brightness diff;
+  some over-exposed areas / shadows (zolfagharipour note).
+- **B6** occlusion NOT common.
+- **C1** all images 256x256. **C2** 7 duplicate pairs exist. **C3** classes
+  human-distinguishable.
 
-## Goal decision log / 目標決策日誌 (grill-me convergence)
-
-- **Q1 acceptance / 驗收** → (a) strategy doc PRIMARY + (b) paper literacy CO-EQUAL.
-  (a) 策略文件為主 + (b) 讀論文素養並列。
-- **Q2 deep-read selection axis / 深讀選擇軸** → **X = decision-relevance 決策相關性**
-  (not pedagogy-for-its-own-sake). Consequence: strategy-doc spine is data-driven.
-  後果:策略文件的脊椎是資料導向,不是方法導向。
-- **Q3 strategy-doc structure / 策略文件結構** → **D = data-driven decision tree 資料導向決策樹** + 6-pt rubric.
-- **Q4 SOTA horizon / 最新方法掃描** → **triage, not tourism 分流而非觀光**: fixed candidate
-  list, each gets a one-paragraph verdict (helpful / not / conditional) traced to a
-  data fact, via the fine-grained / localized-lesion / color-cue lens.
-  固定候選清單,每個一段判決(有用/沒用/有條件)+ 回溯資料事實,用「細粒度/局部病斑/顏色線索」鏡片。
-- **Q5 deep-read picks / 深讀名單** → **config α: SnapMix + RandAugment** (exactly 2, beyond
-  traditional transforms 傳統轉換之外恰好 2 個). Leverage / 槓桿: SnapMix drags in
-  CutMix+Mixup as baselines; RandAugment drags in AutoAugment+TrivialAugment lineage
-  → ~6 methods understood via 2 deep reads. 一篇帶基線,2 篇實質懂 6 法。
-  Triage rejects / 分流拒絕: generative (A3 smallest=275, not scarce 最小 275 非極少),
-  vanilla Mixup (global blend harms color cue B1 全域混色傷顏色線索); Random Erasing =
-  conditional (B6 occlusion=NO weakens rationale 遮擋=NO 削弱理由).
-  **Accepted consequence / 接受的後果:** the shipped Augmentation.py uses only
-  traditional + bounded color (already known); the deep learning lives in the
-  strategy doc + the two papers + Part 4. 交付的程式只用已會的傳統+有界色彩,深學落在策略文件、
-  兩篇論文與 Part 4。
-
-## Strategy-doc rubric / 策略文件評分表 (pass = all 6 checked / 6 條全勾才及格)
-
-1. Every method decision traces to ≥1 concrete data fact (cite Issue #4 Ax/Bx/Cx).
-   每個方法決策都回溯到 ≥1 條具體資料事實(引用 Issue #4 的 Ax/Bx/Cx 編號)。
-2. ≥2 explicit **reject** decisions with reasons (e.g. generative, Mixup).
-   ≥2 個明確的**拒絕**決策且說得出理由(如生成式、Mixup)。
-3. Every method tagged on the 3 axes — proves no method mis-placed (CutMix ≠ Augmentation.py).
-   每個方法標注三軸坐標 — 證明沒放錯位(CutMix 不能塞進 Augmentation.py)。
-4. Each deep-read paper (SnapMix, RandAugment) restated as own-words pseudo-code.
-   兩篇深讀(SnapMix、RandAugment)各能用自己的話寫出核心機制 pseudo-code。(同時滿足驗收 (b))
-5. ≥1 data risk's effect on augmentation named (e.g. C2 dup pairs → dedup? B5 shadow → simulate?).
-   指出 ≥1 個資料風險如何影響增強(如 C2 重複圖 → 要不要去重?B5 過曝陰影 → 要不要模擬?)。
-6. Explicit Part-2 (→ Augmentation.py) vs Part-4 (→ train.py) split.
-   明確切分 Part 2(→ Augmentation.py)與 Part 4(→ train.py)。
-
-## The 3-axis taxonomy / 三軸分類學 (organizing frame / 組織框架)
-
-| Axis / 軸 | One end / 一端 | Other end / 另一端 |
+## 4. The 3-axis taxonomy
+| Axis | one end | other end |
 |------|---------|-----------|
-| unit 作用單位 | per-sample (1→1) 單張 | batch (mix ≥2) 多張混合 |
-| label 標籤 | label-preserving 標籤不變 | label-mixing (soft) 標籤混合(軟標籤) |
-| timing 時機 | offline (savable) 可存檔 | online (dataloader only) 僅訓練期 |
+| unit | per-sample (1→1) | batch (mix ≥2) |
+| label | label-preserving | label-mixing (soft labels) |
+| timing | offline (savable file) | online (dataloader only) |
 
-Placement of the families / 各方法家族定位:
+## 5. METHOD KNOWLEDGE (the core)
 
-| Method 方法 | unit | label | savable? 可存檔 | Part |
-|--------|------|-------|----------|------|
-| geometric 幾何 (flip/rotate/shear/skew/crop) | per-sample | preserving | ✅ | 2 |
-| color bounded 有界色彩 | per-sample | preserving | ✅ | 2 |
-| Random Erasing/Cutout 抹除 | per-sample | preserving | ✅ | 2 (conditional 有條件) |
-| RandAugment | per-sample policy 策略 | preserving | ⚠️ both | 4 (deep-read 深讀) |
-| Mixup | batch(2) | mixing | ❌ | 4 (reject 拒絕) |
-| CutMix | batch(2) | mixing | ❌ | 4 (baseline 基線) |
-| SnapMix | batch(2) | mixing (CAM-weighted CAM加權) | ❌ | 4 (deep-read 深讀) |
-| generative 生成式 (GAN/diffusion) | synthesis 合成 | assigned | ⚠️ | 4 (reject 拒絕) |
+### 5.1 Geometric (flip / rotate / shear / skew / crop)
+- **Mechanism:** remap output pixel coords to source via an affine 2x3 matrix
+  (rotate/shear/skew), an axis mirror (flip), or a slice + resize (crop).
+- **Axes:** per-sample · label-preserving · savable → **Part 2**.
+- **Why SUITABLE here:** B4 top-down with no canonical orientation → any rotation/
+  flip is a *realistic* view, so labels stay valid. Geometric ops do not touch
+  color, so the B1 disease cue is preserved. C1 fixed 256x256 is easy to maintain
+  (crop then resize back).
+- **Why NOT / risks:** extreme crop can remove lesion evidence (B3 lesions cover
+  ~10%, scattered → keep crop moderate); large shear/skew makes unrealistic leaf
+  shapes; watch border/fill artifacts after rotation.
+- **Verdict:** USE — core of Augmentation.py.
+- **Refs:** Krizhevsky et al. 2012 (AlexNet, flips+crops); Shorten &
+  Khoshgoftaar, "A survey on Image Data Augmentation for Deep Learning",
+  J. Big Data 2019.
 
-## Withhold contract / withhold 契約 (what the learner must produce / 學習者必須產出什麼)
+### 5.2 Color / photometric (brightness, contrast, HSV) — BOUNDED
+- **Mechanism:** per-pixel intensity / channel transform (no geometry change).
+- **Axes:** per-sample · label-preserving · savable → **Part 2**.
+- **Why SUITABLE:** B5 slight brightness variation + over-exposure/shadow →
+  mild brightness/contrast jitter improves robustness to lighting.
+- **Why NOT / risks:** B1 color is the MAIN disease cue → large hue/saturation
+  shifts can erase or fake the lesion signal (brown↔green). MUST bound tightly;
+  prefer brightness/contrast over hue/saturation.
+- **Verdict:** USE but STRICTLY BOUNDED.
+- **Refs:** Szegedy et al. 2015 (color jitter); survey above.
 
-- **EN.** Learner writes pseudo-code of the core mechanism + the strategy decisions.
-  Mentor supplies runnable plumbing & sources; on deep-reads, decodes the paper
-  section-by-section but the pseudo-code restatement is the learner's. Augmentation.py
-  is NOT the learning target → mentor may scaffold it generously.
-- **中文.** 學習者寫「變換機制的 pseudo-code」+「策略決策」。導師提供可跑的 plumbing 與來源;
-  深讀時導師逐段解論文,但 pseudo-code 重述由學習者完成。Augmentation.py 不是學習重點 → 導師可大方搭骨架。
-- Stack 技術棧: **cv2 + numpy** (team-consistent w/ Transformation; exposes the matrix
-  與 Transformation 一致、且把矩陣攤開), display via **matplotlib**. No plantcv/pandas/altair/tqdm.
+### 5.3 Random Erasing / Cutout / GridMask
+- **Mechanism:** zero-out or random-fill a region (rectangle; GridMask = grid).
+- **Axes:** per-sample · label-preserving · savable → **Part 2**.
+- **Why SUITABLE:** generic regularizer; forces the model not to over-rely on one
+  leaf region (helps fine-grained discrimination).
+- **Why NOT / risks:** B6 occlusion=NO and B2 missing-parts only ~10% → the
+  "simulate occlusion" justification is WEAK for this dataset. B3 lesions are only
+  ~10% of surface → a large erase can delete the only disease evidence. If used:
+  small region, low probability.
+- **Verdict:** CONDITIONAL (small + low-p only).
+- **Refs:** DeVries & Taylor, "Cutout", 2017 (arXiv:1708.04552); Zhong et al.,
+  "Random Erasing", AAAI 2020 (arXiv:1708.04896); Chen et al., "GridMask", 2020
+  (arXiv:2001.04086).
 
-## Team context / 團隊脈絡 (git + GitHub, surveyed 2026-06-06)
+### 5.4 Mixup
+- **Mechanism:** pixel-wise convex combination of two images by λ; label = the
+  same λ-weighted mix of the two one-hot labels.
+- **Axes:** batch(2) · label-mixing · NOT savable → **Part 4**.
+- **Why SUITABLE:** strong regularizer; improves calibration.
+- **Why NOT / risks:** global blending AVERAGES the colors of two leaves →
+  muddies the exact B1 color cue that separates diseases; for localized, color-
+  based cues a global blend is worse than a patch-based method.
+- **Verdict:** REJECT (in favor of CutMix/SnapMix).
+- **Refs:** Zhang et al., "mixup", ICLR 2018 (arXiv:1710.09412).
 
-- Repo `Recursive-Descenders/Leaffliction`. `main` = integration (Distribution +
-  Image-analysis merged). `mzolfagh/Transformation` = PR #2 OPEN (cv2 + plantcv).
-  主分支已併入 Distribution + Image-analysis;Transformation 為 PR #2 開發中。
-- CLI convention 慣例: thin `src/Augmentation.py` → `typer.run(run)`; logic in
-  `src/augmentation/`; output `outputs/augmentation/`; flake8.
-- pyproject gotcha 坑: `packages.find include = ["distribution*"]` must add
-  `"augmentation*"` or `uv run aug` won't import. 否則 `uv run aug` 匯入失敗。
-- **Issue #4** (data analysis, answered / 資料分析,已回覆): ~6x imbalance
-  (apple_healthy 1640 vs apple_rust 275; smallest 275 → NOT scarce 非極少).
-  B1 color = main disease cue 顏色為病徵主因 → color shifts RISKY 色彩偏移有風險.
-  B2 shape NO 形狀非主因, B3 lesion scattered ~10% 病斑散佈, B4 top-down 俯視,
-  B5 lighting low-variation 光照變化小, B6 occlusion NO 無遮擋, C1 all 256x256,
-  C2 7 dup pairs 7 組重複圖.
-- **Issue #1** (OPEN, unresolved / 未解): balancing semantics + augmented_directory
-  return → affects Augmentation.py output behavior. 影響程式輸出行為,待團隊決定.
+### 5.5 CutMix (baseline for the deep-read)
+- **Mechanism:** paste a rectangular patch of image B into A; the soft label is
+  weighted by the patch AREA fraction.
+- **Axes:** batch(2) · label-mixing · NOT savable → **Part 4**.
+- **Why SUITABLE:** keeps local pixel statistics intact (no color averaging) →
+  preserves the color cue; "localizable features" help fine-grained-ish tasks.
+- **Why NOT / risks:** area-proportional label is WRONG when the pasted patch
+  lands on a non-discriminative region (e.g. background) — the label claims X%
+  content that isn't there. This label-noise is exactly what SnapMix fixes.
+- **Verdict:** BASELINE — understood via the SnapMix deep-read.
+- **Refs:** Yun et al., "CutMix", ICCV 2019 (arXiv:1905.04899).
 
-## Stage decomposition / 階段拆解
+### 5.6 SnapMix — DEEP-READ #1
+- **Mechanism (summary):** use a CAM (class activation map) to weight the soft
+  label by the actual *discriminative content* of the mixed regions, not by raw
+  area. `[deep mechanism + exact label formula to fill after reading]`
+- **Axes:** batch(2) · label-mixing (CAM-weighted) · NOT savable → **Part 4**.
+- **Why SUITABLE:** designed for FINE-GRAINED data (Early vs Late Blight differ
+  subtly) → removes CutMix's label-noise; respects where the disease cue actually
+  is. Highest decision-relevance among mixing methods for plant disease.
+- **Why NOT / risks:** needs a (pre)trained network to produce CAMs; more complex
+  pipeline. `[full risk analysis to fill after reading]`
+- **Verdict:** DEEP-READ (drags in CutMix + Mixup as baselines).
+- **Refs:** Huang et al., "SnapMix: Semantically Proportional Mixing for
+  Augmenting Fine-grained Data", AAAI 2021 (arXiv:2012.04846).
 
-| # | Stage goal / 階段目標 | Acceptance / 驗收 | Withhold | Part |
-|---|-----------|-----------|----------|------|
-| 1 | 3-axis taxonomy: place any method 三軸分類學:能定位任意方法 | Place all 8 families correctly 8 個都放對 | learner places | frame |
-| 2 | Data-fact → decision spine 資料事實→決策脊椎 | Decision-tree skeleton; geometric accept, color bounded, rejects 決策樹骨架 | learner argues | doc |
-| 3 | Ship Augmentation.py: traditional + bounded color 交付程式 | Runs per subject, no crash, flake8 | mentor may scaffold | 2 |
-| 4 | SOTA triage 最新方法分流 | Triage table; ≥2 rejects justified 分流表 | learner verdicts | doc |
-| 5 | Deep-read SnapMix (CutMix+Mixup baselines) 深讀 SnapMix | Pseudo-code of CAM-weighted label mix; why > CutMix | learner pseudo-code | 4 |
-| 6 | Deep-read RandAugment (AutoAugment→TrivialAugment) 深讀 RandAugment | Pseudo-code of policy; N/M search-space | learner pseudo-code | 4 |
-| 7 | Synthesize strategy doc 綜合成策略文件 | All 6 rubric checks pass 6 條全勾 | learner writes | both |
+### 5.7 RandAugment — DEEP-READ #2
+- **Mechanism (summary):** sample N operations from a fixed set, each applied at a
+  single global magnitude M; only 2 hyperparameters (N, M).
+  `[search-space reasoning + op list to fill after reading]`
+- **Axes:** per-sample policy · label-preserving · both timings → **Part 4** (could
+  also run offline).
+- **Why SUITABLE:** Leaffliction is natural-image classification close to the
+  ImageNet distribution → the standard RandAugment search space transfers well;
+  automates "which combination of the safe per-sample ops"; far cheaper than
+  AutoAugment's learned search.
+- **Why NOT / risks:** the default op set includes strong color ops (hue,
+  posterize, solarize) that conflict with the B1 color cue → must PRUNE the op
+  set for this dataset. `[full analysis to fill after reading]`
+- **Verdict:** DEEP-READ (drags in AutoAugment + TrivialAugment lineage; strategy
+  conclusion may still pick TrivialAugment for simplicity).
+- **Refs:** Cubuk et al., "RandAugment", NeurIPS 2020 (arXiv:1909.13719);
+  Cubuk et al., "AutoAugment", CVPR 2019 (arXiv:1805.09501); Müller & Hutter,
+  "TrivialAugment", ICCV 2021 (arXiv:2103.10158).
 
-## Per-stage gap lists & sources / 各階段缺口與來源
-_(filled as we enter each stage / 進入各階段時填寫)_
+### 5.8 Generative (GAN / Diffusion) — counter-example
+- **Mechanism:** synthesize new class-conditioned images.
+- **Axes:** synthesis · assigned label · conditional → **Part 4**.
+- **Why it would be SUITABLE (in general):** only when a class is *extremely*
+  scarce (tens of samples).
+- **Why NOT here:** A3 smallest class = 275 (not scarce), A4 only ~6x imbalance →
+  geometric + bounded color balancing already suffices. Generative adds label-
+  fidelity risk, possible mode collapse, distribution shift, and huge cost for no
+  benefit on this dataset.
+- **Verdict:** REJECT for Leaffliction (the strategy's clearest "why-not").
+- **Refs:** Trabucco et al., "Effective Data Augmentation With Diffusion Models"
+  (DA-Fusion), ICLR 2024 (arXiv:2302.07944).
 
-## Glossary / 詞彙表
+### 5.9 SOTA triage shortlist (one-line verdicts)
+| Method | verdict | why (data fact) |
+|--------|---------|-----------------|
+| TrivialAugment (arXiv:2103.10158) | CONDITIONAL/maybe-best | parameter-free → "simpler = more defensible"; still prune color ops (B1) |
+| GridMask (arXiv:2001.04086) | CONDITIONAL | structured erasing; same B3/B6 caveat as Random Erasing |
+| SaliencyMix (arXiv:2006.01791) / PuzzleMix (arXiv:2009.06962) | candidate | saliency-guided mixing — same fine-grained motive as SnapMix |
+| AugMix (arXiv:1912.02781) | maybe | robustness via aug chains + consistency loss; B5 lighting is mild so limited gain |
+| TTA (test-time augmentation) | free win | not training aug; apply flips/crops at inference, average — Part 4 |
 
-| Term 術語 | Plain meaning / 白話 |
-|------|---------------|
-| augmentation 資料增強 | Make new training images by transforming existing ones 透過變換既有圖製造新訓練圖 |
-| class imbalance 類別不平衡 | Some classes have far more images (~6x) → model biased to majority 某些類別多很多 → 模型偏向多數 |
-| fine-grained classification 細粒度分類 | Classes differ only subtly (Early vs Late Blight) → cue is small/local 類別差異極小 → 線索小而局部 |
-| label-preserving 標籤保持 | Transform keeps the original label valid 變換後原標籤仍正確 |
-| label-mixing 標籤混合 | Blend 2 images AND their labels into a soft label 混兩張圖與其標籤成軟標籤 |
-| affine transform 仿射變換 | rotate/scale/shear + translation; cv2 2x3 matrix M 旋轉/縮放/剪切+平移,cv2 的 2×3 矩陣 |
-| warpAffine | cv2: per output pixel, use M to find source pixel 每個輸出像素用 M 找回源像素 |
-| displacement field 位移場 | per-pixel (dx,dy) offsets; basis of elastic distortion 每像素位移,彈性扭曲的基礎 |
-| Mixup | mix two images by convex combo λ; label = λ-weighted 凸組合混兩圖,標籤按 λ 加權 |
-| CutMix | paste a patch of B into A; label weighted by patch area 把 B 的方塊貼進 A,標籤按面積加權 |
-| SnapMix | CutMix using CAM to weight the soft label by real discriminative content, for fine-grained 用 CAM 按真實判別內容加權標籤,專為細粒度 |
-| CAM | class activation map: where the network looks to decide a class 類別活化圖:網路看哪裡做判斷 |
-| RandAugment | pick N random ops at magnitude M from a fixed set 從固定集隨機選 N 個操作、強度 M |
-| AutoAugment | learn an aug policy by search (expensive) 用搜尋學增強策略(昂貴) |
-| TrivialAugment | parameter-free: one random op, random magnitude 零參數:一個隨機操作、隨機強度 |
-| triage 分流 | quick relevance verdict: helpful / not / conditional + why 快速判決:有用/沒用/有條件+理由 |
+> Citation note: arXiv IDs are from memory and should be sanity-checked before
+> citing in the final doc. The user-cited "EfficientNetV2-M tomato leaf CutMix vs
+> Mixup, 86% acc" paper is **to verify** (exact authors/venue unknown).
 
-## Mastery state / 精熟狀態
-Legend / 圖例: `unknown → reading → implemented → explained` (reversible 可逆)
+## 6. Strategy-doc rubric (pass = all 6)
+1. Every method decision traces to ≥1 concrete data fact (cite Ax/Bx/Cx).
+2. ≥2 explicit reject decisions with reasons (e.g. generative, Mixup).
+3. Every method tagged on the 3 axes (proves correct placement).
+4. Each deep-read paper restated as own-words pseudo-code (also satisfies (b)).
+5. ≥1 data risk's effect on augmentation named (e.g. C2 dups → dedup first?).
+6. Explicit Part-2 (Augmentation.py) vs Part-4 (train.py) split.
 
-| Stage | Gap | State |
-|-------|-----|-------|
-| 1 | 3-axis-taxonomy | unknown (drafted in doc; needs learner teach-back 已草擬,待 teach-back) |
-| 2 | data→decision spine | unknown |
-| 3 | augmentation.py | unknown |
-| 4 | sota-triage | unknown |
-| 5 | snapmix | unknown |
-| 6 | randaugment | unknown |
-| 7 | strategy-doc | unknown |
-| (3) | flip-rotate basics | learner-claimed known; verify on entry 學習者自稱已會,進入時驗證 |
+## 7. Learning scaffolding (process, not knowledge)
+**Stages:** (1) taxonomy → (2) data-fact decision spine → (3) ship Augmentation.py
+[traditional+bounded color, Part 2] → (4) SOTA triage → (5) deep-read SnapMix →
+(6) deep-read RandAugment → (7) synthesize strategy doc.
+**Withhold:** learner writes the mechanism pseudo-code + the strategy decisions;
+mentor supplies plumbing (cv2+numpy, matplotlib display) and decodes papers.
+**Mastery legend:** unknown → reading → implemented → explained (reversible).
+**Current state:** §5 knowledge drafted from grill-me reasoning; deep "why" for
+SnapMix (5.6) & RandAugment (5.7) pending the deep-reads; nothing teach-back-
+verified yet.
 
-## Map / 地圖
+---
+
+# 中文
+
+## 1. 學習目標
+能**為一個植物病害偵測資料集,根據其真實資料特性,設計並辯護一套分層的資料增強策略**——
+而不是只會背傳統手法——每個方法都要能論證它的**機制、為什麼在這裡(不)適合、以及對標籤/分佈的風險**。
+
+**一句話能力:**「給我一個植物病害資料集,我能從資料事實推導出增強策略、用文獻佐證每個取捨、
+並讀懂任何新的增強論文來判斷它適不適用。」
+
+## 2. 驗收標準
+- **(a) 主驗收 — 一份可辯護的策略文件**(rubric 見 §6)。
+- **(b) 並列 — 讀論文素養**:讀原始論文、解開數學、用 pseudo-code 重述機制。
+- 不是目標:程式手感、準確率數字。
+
+## 3. 資料事實(證據基礎,出自 Issue #4)
+每個方法決策都必須引用這些「前提」。
+- **A3** 最小類別 = 275 張 → **非極少**。**A4** 不平衡約 6x(apple_healthy 1640 vs apple_rust 275)。
+- **B1** **顏色是病徵主因**(褐斑 vs 健康綠)——核心約束。
+- **B2** 形狀/輪廓非主因;缺損僅約 10%(apple_black_rot)。
+- **B3** 病斑散佈全葉,約佔表面 10%(不是單一小點)。
+- **B4** 一致的俯視拍攝角度(無「正確方向」)。
+- **B5** 光照變化小(室內單光源);亮度略有差;部分過曝/陰影(zolfagharipour 補充)。
+- **B6** 遮擋不常見。
+- **C1** 全部 256x256。**C2** 有 7 組重複圖。**C3** 類別人眼可辨。
+
+## 4. 三軸分類學
+| 軸 | 一端 | 另一端 |
+|------|------|--------|
+| 作用單位 | per-sample(1→1) | batch(混 ≥2) |
+| 標籤 | label-preserving 標籤不變 | label-mixing 標籤混合(軟標籤) |
+| 時機 | offline 可存檔 | online 僅訓練期 |
+
+## 5. 方法知識(核心)
+
+### 5.1 幾何(flip / rotate / shear / skew / crop)
+- **機制:** 用仿射 2×3 矩陣把輸出像素座標映回源座標(rotate/shear/skew)、軸鏡射(flip)、
+  或切片+resize(crop)。
+- **三軸:** per-sample · 標籤不變 · 可存檔 → **Part 2**。
+- **為何適合:** B4 俯視且無正確方向 → 任何旋轉/翻轉都是*真實*視角,標籤仍正確。幾何不動顏色,
+  故 B1 病徵線索保留。C1 固定 256x256 易維持(crop 後 resize 回去)。
+- **為何不適合/風險:** 過度 crop 可能切掉病斑(B3 病斑佔 ~10% 且散佈 → crop 要適度);過大
+  shear/skew 產生不真實葉形;旋轉後注意邊界/填補痕跡。
+- **判決:** 採用 — Augmentation.py 的核心。
+- **文獻:** Krizhevsky 2012(AlexNet,flips+crops);Shorten & Khoshgoftaar 影像增強綜述,
+  J. Big Data 2019。
+
+### 5.2 色彩/光度(亮度、對比、HSV)— 有界
+- **機制:** 逐像素的強度/通道變換(不改幾何)。
+- **三軸:** per-sample · 標籤不變 · 可存檔 → **Part 2**。
+- **為何適合:** B5 亮度略變 + 過曝/陰影 → 輕微亮度/對比抖動可提升對光照的魯棒性。
+- **為何不適合/風險:** B1 顏色是病徵主因 → 大幅色相/飽和位移會洗掉或偽造病斑訊號(褐↔綠)。
+  必須嚴格設界;優先亮度/對比,而非色相/飽和。
+- **判決:** 採用但嚴格設界。
+- **文獻:** Szegedy 2015(色彩抖動);同上綜述。
+
+### 5.3 Random Erasing / Cutout / GridMask
+- **機制:** 把某區域歸零或隨機填補(矩形;GridMask 為網格)。
+- **三軸:** per-sample · 標籤不變 · 可存檔 → **Part 2**。
+- **為何適合:** 通用正則;強迫模型不過度依賴單一葉片區域(助細粒度判別)。
+- **為何不適合/風險:** B6 遮擋=NO、B2 缺損僅 ~10% → 「模擬遮擋」理由對本資料集很弱。B3 病斑僅
+  佔表面 ~10% → 大面積抹除可能刪掉唯一病徵。若用:小區域、低機率。
+- **判決:** 有條件(僅小區域+低機率)。
+- **文獻:** DeVries & Taylor「Cutout」2017(arXiv:1708.04552);Zhong 等「Random Erasing」
+  AAAI 2020(arXiv:1708.04896);Chen 等「GridMask」2020(arXiv:2001.04086)。
+
+### 5.4 Mixup
+- **機制:** 兩張圖按 λ 做逐像素凸組合;標籤 = 兩個 one-hot 同樣按 λ 加權。
+- **三軸:** batch(2) · 標籤混合 · 不可存檔 → **Part 4**。
+- **為何適合:** 強正則;改善校準。
+- **為何不適合/風險:** 全域混合會**平均兩片葉子的顏色** → 弄糊了正是區分病害的 B1 顏色線索;
+  對局部、以顏色為主的線索,全域混合比區塊式更糟。
+- **判決:** 拒絕(改用 CutMix/SnapMix)。
+- **文獻:** Zhang 等「mixup」ICLR 2018(arXiv:1710.09412)。
+
+### 5.5 CutMix(深讀的基線)
+- **機制:** 把 B 的矩形區塊貼進 A;軟標籤按區塊**面積**比例加權。
+- **三軸:** batch(2) · 標籤混合 · 不可存檔 → **Part 4**。
+- **為何適合:** 保留局部像素統計(不平均顏色)→ 保住顏色線索;「可定位特徵」對細粒度任務有益。
+- **為何不適合/風險:** 當貼上的區塊落在非判別區(如背景)時,面積比例標籤是**錯的**——標籤宣稱
+  有 X% 內容但其實沒有。這個標籤雜訊正是 SnapMix 要修的。
+- **判決:** 基線 — 透過 SnapMix 深讀來理解。
+- **文獻:** Yun 等「CutMix」ICCV 2019(arXiv:1905.04899)。
+
+### 5.6 SnapMix — 深讀 #1
+- **機制(摘要):** 用 CAM(類別活化圖)按混合區域的真實*判別內容*加權軟標籤,而非按原始面積。
+  `[深層機制 + 確切標籤公式,讀後補]`
+- **三軸:** batch(2) · 標籤混合(CAM 加權)· 不可存檔 → **Part 4**。
+- **為何適合:** 專為**細粒度**資料設計(Early vs Late Blight 差異極小)→ 去除 CutMix 的標籤雜訊;
+  尊重病徵真正所在。在混合類方法中對植物病害決策相關性最高。
+- **為何不適合/風險:** 需要(預)訓練網路產生 CAM;管線較複雜。`[完整風險,讀後補]`
+- **判決:** 深讀(免費帶 CutMix + Mixup 基線)。
+- **文獻:** Huang 等「SnapMix: Semantically Proportional Mixing for Augmenting
+  Fine-grained Data」AAAI 2021(arXiv:2012.04846)。
+
+### 5.7 RandAugment — 深讀 #2
+- **機制(摘要):** 從固定操作集隨機選 N 個,各以單一全域強度 M 套用;只有 2 個超參(N, M)。
+  `[搜尋空間推理 + 操作清單,讀後補]`
+- **三軸:** per-sample 策略 · 標籤不變 · 兩種時機皆可 → **Part 4**(也可離線)。
+- **為何適合:** Leaffliction 屬自然影像分類、接近 ImageNet 分佈 → 標準 RandAugment 搜尋空間可遷移;
+  自動化「該組合哪些安全的 per-sample 操作」;遠比 AutoAugment 的學習式搜尋便宜。
+- **為何不適合/風險:** 預設操作集含強色彩操作(色相、posterize、solarize)會與 B1 顏色線索衝突 →
+  本資料集必須**裁剪**操作集。`[完整分析,讀後補]`
+- **判決:** 深讀(帶出 AutoAugment + TrivialAugment 譜系;策略結論仍可選 TrivialAugment 求簡單)。
+- **文獻:** Cubuk 等「RandAugment」NeurIPS 2020(arXiv:1909.13719);Cubuk 等「AutoAugment」
+  CVPR 2019(arXiv:1805.09501);Müller & Hutter「TrivialAugment」ICCV 2021(arXiv:2103.10158)。
+
+### 5.8 生成式(GAN / Diffusion)— 反面教材
+- **機制:** 合成新的「以類別為條件」的影像。
+- **三軸:** 合成 · 指定標籤 · 有條件 → **Part 4**。
+- **一般而言何時適合:** 只有當某類**極度**稀少(數十張)時。
+- **為何在這裡不適合:** A3 最小類別 = 275(非極少)、A4 僅 ~6x 不平衡 → 幾何+有界色彩平衡已足夠。
+  生成式徒增標籤保真風險、可能 mode collapse、分佈偏移、成本巨大卻對本資料集無益。
+- **判決:** 對 Leaffliction 拒絕(策略中最清楚的「為何不用」)。
+- **文獻:** Trabucco 等「Effective Data Augmentation With Diffusion Models」(DA-Fusion)
+  ICLR 2024(arXiv:2302.07944)。
+
+### 5.9 SOTA triage 候選短表(一句判決)
+| 方法 | 判決 | 理由(資料事實) |
+|--------|---------|-----------------|
+| TrivialAugment (arXiv:2103.10158) | 有條件/可能最佳 | 零參數 → 「更簡單更可辯護」;仍須裁剪色彩操作(B1) |
+| GridMask (arXiv:2001.04086) | 有條件 | 結構化抹除;與 Random Erasing 同樣受 B3/B6 限制 |
+| SaliencyMix (arXiv:2006.01791) / PuzzleMix (arXiv:2009.06962) | 候選 | 顯著性引導混合 — 與 SnapMix 同樣的細粒度動機 |
+| AugMix (arXiv:1912.02781) | 也許 | 增強鏈+一致性損失提升魯棒;B5 光照本就溫和 → 增益有限 |
+| TTA(測試期增強) | 免費漲分 | 非訓練增強;推論時套 flips/crops 再平均 — Part 4 |
+
+> 文獻備註:arXiv 編號為記憶所得,**最終引用前須核對**。使用者引用的「EfficientNetV2-M 番茄葉
+> CutMix vs Mixup,86% 準確率」論文**待查證**(確切作者/出處未知)。
+
+## 6. 策略文件評分表(6 條全勾才及格)
+1. 每個方法決策回溯 ≥1 條具體資料事實(引用 Ax/Bx/Cx)。
+2. ≥2 個明確拒絕決策且有理由(如生成式、Mixup)。
+3. 每個方法標注三軸(證明放對位置)。
+4. 兩篇深讀各能用自己的話寫出 pseudo-code(同時滿足 (b))。
+5. 指出 ≥1 個資料風險如何影響增強(如 C2 重複 → 要先去重?)。
+6. 明確切分 Part 2(Augmentation.py)與 Part 4(train.py)。
+
+## 7. 學習鷹架(流程,非知識)
+**階段:**(1) 分類學 →(2) 資料事實決策脊椎 →(3) 交付 Augmentation.py〔傳統+有界色彩,Part 2〕→
+(4) SOTA triage →(5) 深讀 SnapMix →(6) 深讀 RandAugment →(7) 綜合成策略文件。
+**Withhold:** 學習者寫機制 pseudo-code + 策略決策;導師提供 plumbing(cv2+numpy、matplotlib 顯示)
+並解讀論文。
+**精熟圖例:** unknown → reading → implemented → explained(可逆)。
+**目前狀態:** §5 知識由 grill-me 推理草擬;SnapMix(5.6)與 RandAugment(5.7)的深層「為何」待深讀補;
+尚無任何 teach-back 驗證通過。
+
+---
+
+## Map (shared / 共用)
 ```mermaid
 graph TD
   G[Goal: defensible aug strategy for plant disease]
