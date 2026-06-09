@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision Graph — Augmentor Pipeline</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" integrity="sha384-en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/" crossorigin="anonymous"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'JetBrains Mono', monospace; background: #020617; color: #e2e8f0;
+      background-image: linear-gradient(#0b1220 1px, transparent 1px), linear-gradient(90deg, #0b1220 1px, transparent 1px);
+      background-size: 40px 40px; padding: 24px; }
+    .container { max-width: 1600px; margin: 0 auto; }
+    .header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; position: relative; }
+    .pulse-dot { width: 10px; height: 10px; border-radius: 50%; background: #22d3ee; box-shadow: 0 0 0 0 rgba(34,211,238,.7); animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(34,211,238,.5); } 70% { box-shadow: 0 0 0 10px rgba(34,211,238,0); } 100% { box-shadow: 0 0 0 0 rgba(34,211,238,0); } }
+    h1 { font-size: 18px; font-weight: 700; letter-spacing: .5px; }
+    .subtitle { color: #64748b; font-size: 11px; margin: 0 0 16px 22px; }
+    .toolbar { margin-left: auto; }
+    .toolbar-actions { display: none; gap: 6px; }
+    .toolbar.open .toolbar-actions { display: inline-flex; }
+    .toolbar button { background: #0f172a; color: #94a3b8; border: 1px solid #1e293b; border-radius: 6px;
+      font-family: inherit; font-size: 11px; padding: 5px 10px; cursor: pointer; }
+    .toolbar button:hover { color: #e2e8f0; border-color: #334155; }
+    .stage { position: relative; border: 1px solid #1e293b; border-radius: 12px; background: rgba(2,6,23,.5);
+      padding: 8px; overflow: visible; }
+    .stage svg { position: absolute; top: 0; left: 0; pointer-events: none; }
+    /* node */
+    .node { position: absolute; width: 250px; min-height: 124px; border-radius: 8px; padding: 10px 12px; cursor: default;
+      background: #0f172a; border: 1.5px solid #1f6feb; transition: transform .1s; }
+    .node:hover { transform: scale(1.02); z-index: 50; }
+    .node .idbadge { position: absolute; top: -9px; right: -9px; background: #1f6feb; color: #fff;
+      font-size: 10px; font-weight: 700; border-radius: 10px; padding: 1px 7px; }
+    .node .q { font-size: 12px; font-weight: 600; color: #f1f5f9; line-height: 1.35; }
+    .node .qzh { display: block; font-size: 10.5px; font-weight: 500; color: #7dd3fc; margin-top: 2px; line-height: 1.3; }
+    .node .adopted { font-size: 10px; color: #34d399; margin-top: 6px; line-height: 1.3; }
+    .node .adopted .azh { color: #5eead4; }
+    .node .rejcount { font-size: 9px; color: #64748b; margin-top: 4px; }
+    /* status variants */
+    .node.stale { border-color: #64748b; border-style: dashed; opacity: .65; }
+    .node.stale .idbadge { background: #64748b; }
+    .node.graduated { border-color: #f0b429; box-shadow: 0 0 0 1px #f0b429; }
+    .node.graduated .idbadge { background: #f0b429; color: #1a1a1a; }
+    .node.abandoned { opacity: .35; }
+    /* hover detail panel */
+    .node .detail { display: none; position: absolute; top: calc(100% + 8px); left: 0; width: 300px;
+      background: #0b1220; border: 1px solid #334155; border-radius: 8px; padding: 10px 12px; z-index: 100;
+      box-shadow: 0 8px 24px rgba(0,0,0,.6); }
+    .node:hover .detail { display: block; }
+    .detail .premise { font-size: 10px; color: #94a3b8; margin-bottom: 8px; }
+    .detail .premise b { color: #22d3ee; }
+    .detail .rej-title { font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+    .detail .rej { font-size: 10px; color: #cbd5e1; margin-bottom: 6px; line-height: 1.35; }
+    .detail .rej b { color: #fb7185; }
+    /* legend */
+    .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 16px; font-size: 10px; color: #94a3b8; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend i { width: 22px; height: 0; border-top-width: 2px; border-top-style: solid; display: inline-block; }
+    .swatch { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid; }
+    @media print { .toolbar { display: none !important; } }
+  </style>
+</head>
+<body>
+  <div class="container" id="report-container">
+    <div class="header">
+      <div class="pulse-dot"></div>
+      <h1 id="title">Decision Graph</h1>
+      <div class="toolbar" id="toolbar">
+        <div class="toolbar-actions">
+          <button onclick="copyAsImage(this)">📋 Copy</button>
+          <button onclick="downloadPNG(this)">🖼️ PNG</button>
+          <button onclick="downloadPDF(this)">📄 PDF</button>
+        </div>
+        <button class="toolbar-toggle" onclick="document.getElementById('toolbar').classList.toggle('open')">⋯</button>
+      </div>
+    </div>
+    <p class="subtitle" id="subtitle">Backbone = dependency tree · dashed = cross-edges · hover a node for rejected options · #N = time axis<br>主幹=依賴樹 · 虛線=交叉邊 · hover 節點看否決選項 · #N=時間軸</p>
+    <div class="stage" id="stage">
+      <svg id="edges"></svg>
+    </div>
+    <div class="legend">
+      <span><i style="border-color:#475569"></i> backbone (depends-on)</span>
+      <span><i style="border-color:#a78bfa;border-top-style:dashed"></i> feeds</span>
+      <span><i style="border-color:#fbbf24;border-top-style:dashed"></i> supersedes</span>
+      <span><i style="border-color:#fb7185;border-top-style:dashed"></i> failure route</span>
+      <span><span class="swatch" style="border-color:#1f6feb"></span> active</span>
+      <span><span class="swatch" style="border-color:#64748b;border-style:dashed"></span> stale</span>
+      <span><span class="swatch" style="border-color:#f0b429"></span> graduated</span>
+    </div>
+  </div>
+
+  <script>
+    // ===========================================================================
+    //  Augmentor pipeline decision graph — generated from docs/decision-graph.md
+    //  Bilingual: English (canonical) + Traditional Chinese (qzh / azh / reason_zh)
+    // ===========================================================================
+    const META = { title: "Decision Graph — Augmentor Pipeline" };
+    const GRAPH = {
+      nodes: [
+        { id:1, question:"Composition strategy: how many transforms per output?",
+          question_zh:"組合策略：每張輸出疊幾個 transform？",
+          adopted:"K=2 random subset (RandAugment-lite)",
+          adopted_zh:"K=2 隨機抽（RandAugment-lite）",
+          status:"resolved", dependsOn:null, premise:null,
+          rejected:[
+            { name:"a — 1 transform per output", reason:"subject Part 2 already does this; no exposure to real-world compound conditions", reason_zh:"subject Part 2 已實作；無法暴露於現實世界的複合擾動" },
+            { name:"c — stack all N", reason:"B1 (color = signal) cannot survive 6-layer compounding", reason_zh:"B1 顏色訊號無法承受 6 層疊加" },
+            { name:"d — mixed (some 1, some many)", reason:"adds complexity without clear win", reason_zh:"增加複雜度卻無明顯收益" }
+          ] },
+
+        { id:2, question:"Calibration: how to set per-method safe magnitude?",
+          question_zh:"校準：怎麼定每個 method 的安全 magnitude？",
+          adopted:"d — literature + EDA heuristic ⚠️ revisit-candidate",
+          adopted_zh:"d — 文獻 + EDA 啟發式 ⚠️ 待重訪",
+          status:"resolved", dependsOn:1, premise:"K=2 random subset",
+          rejected:[
+            { name:"a — manual human scan only", reason:"slow, subjective; can't catch K=2 compounding effects", reason_zh:"慢、主觀；無法捕捉 K=2 的疊加效應" },
+            { name:"b — full K=2 stress test", reason:"O(N²) human review work; overkill pre-training", reason_zh:"O(N²) 人工檢視工作量；訓練前過度設計" },
+            { name:"c — classifier-feedback loop", reason:"chicken-and-egg; risk of overfitting to baseline biases", reason_zh:"先有雞還是先有蛋；過擬合 baseline 偏見的風險" },
+            { name:"e — d + sampled b stress test", reason:"recommended hybrid; deferred for MVP simplicity", reason_zh:"推薦混合方案；為了 MVP 簡潔而延後" }
+          ] },
+
+        { id:3, question:"Scope: at what input level does the augmentor operate?",
+          question_zh:"範圍：augmentor 處理什麼層級輸入？",
+          adopted:"D — A+B+C share one K=2 core",
+          adopted_zh:"D — A+B+C 共用一個 K=2 core",
+          status:"resolved", dependsOn:1, premise:"K=2 random subset",
+          rejected:[
+            { name:"A only — single-image CLI", reason:"kills B/C; can't balance 6× imbalance", reason_zh:"扼殺 B/C；無法平衡 6× 不平衡" },
+            { name:"B only — class folder", reason:"requires manual loop per class", reason_zh:"需要對每個 class 手動迴圈" },
+            { name:"C only — dataset root", reason:"loses demo / debugging capability", reason_zh:"失去 demo / debugging 能力" }
+          ] },
+
+        { id:4, question:"Balance target: how to define 'balanced' per class?",
+          question_zh:"平衡目標：如何定義各 class 的『平衡』？",
+          adopted:"a — match max class count",
+          adopted_zh:"a — 對齊 max class 數量",
+          status:"resolved", dependsOn:3, premise:"dataset mode C",
+          rejected:[
+            { name:"b — configurable N", reason:"N < max requires throwing real data away", reason_zh:"N < max 必須丟棄真實資料" },
+            { name:"c — per-class multiplier", reason:"doesn't fix relative imbalance (still 6×)", reason_zh:"無法修復相對不平衡（仍 6×）" },
+            { name:"d — match-max + opt-in majority aug", reason:"no clear benefit; complicates baseline", reason_zh:"無明顯收益；使 baseline 複雜化" }
+          ] },
+
+        { id:5, question:"Source sampling: how many K=2 outputs per source?",
+          question_zh:"來源抽樣：每張源圖產幾個 K=2 輸出？",
+          adopted:"β — round-robin + seeded RNG",
+          adopted_zh:"β — round-robin + seeded RNG",
+          status:"resolved", dependsOn:4, premise:"match max class count",
+          rejected:[
+            { name:"α — random with replacement", reason:"high variance; some sources may be ignored entirely", reason_zh:"方差高；部分源圖可能完全沒被使用" },
+            { name:"γ — shuffle cycles", reason:"no value over β; K=2 already provides per-output variety", reason_zh:"相對 β 無增益；K=2 本身已提供逐輸出變化" },
+            { name:"δ — stratified by attribute", reason:"requires attribute labels (lighting / angle); out of scope", reason_zh:"需要屬性標籤（光線/角度）；超出範圍" }
+          ] },
+
+        { id:6, question:"Dedup pre-processing?",
+          question_zh:"是否做 dedup 預處理？",
+          adopted:"YES — exact file-hash (SHA-256 / MD5)",
+          adopted_zh:"YES — 用 file-hash 比對（SHA-256 / MD5）",
+          status:"resolved", dependsOn:3, premise:"dataset mode C",
+          rejected:[
+            { name:"no dedup", reason:"EDA C2 found 7 known dup pairs; their augmented copies inherit the dup weight", reason_zh:"EDA C2 找到 7 對重複；其增強副本會繼承重複權重" }
+          ] },
+
+        { id:7, question:"Train/val split timing relative to augmentation",
+          question_zh:"Train/val split 與 augmentation 的順序",
+          adopted:"IV — separate split CLI; augmentor only sees train/",
+          adopted_zh:"IV — split 為獨立 CLI；augmentor 只看 train/",
+          status:"resolved", dependsOn:3, premise:"dataset mode C",
+          rejected:[
+            { name:"I — augment-then-split", reason:"DATA LEAK: augmented copies span train and val", reason_zh:"資料外洩：同源增強副本橫跨 train 與 val" },
+            { name:"II — monolithic split-then-augment", reason:"correct but couples concerns", reason_zh:"邏輯正確但耦合過深" },
+            { name:"III — augmentor handles split internally", reason:"implicit; re-splits each run, breaks val-set stability", reason_zh:"隱式行為；每次執行重新切，破壞 val 穩定" }
+          ] },
+
+        { id:8, question:"Method pool composition",
+          question_zh:"Method pool 組成",
+          adopted:"A — geometric-only (6 methods) ⚠️ revisit-planned",
+          adopted_zh:"A — 純 geometric（6 個） ⚠️ 已規劃重訪",
+          status:"resolved", dependsOn:1, premise:"K=2 random subset",
+          rejected:[
+            { name:"B — 6 + color_jitter", reason:"blocked on S3 implementation; queued as planned upgrade", reason_zh:"卡在 S3 實作；已列為計劃升級" },
+            { name:"C — 6 + color_jitter + erasure", reason:"erasure unsafe under B3 (scattered features)", reason_zh:"擦除在 B3（特徵分散）下不安全" },
+            { name:"D — configurable pool flag", reason:"over-engineered for current needs", reason_zh:"對目前需求過度設計" }
+          ] },
+
+        { id:9, question:"Output filename convention",
+          question_zh:"輸出檔名格式",
+          adopted:"<stem>_<Method1>_<Method2>_<i>.<ext>",
+          adopted_zh:"<stem>_<Method1>_<Method2>_<i>.<ext>",
+          status:"resolved", dependsOn:1, premise:"K=2 random subset",
+          rejected:[
+            { name:"<stem>_aug_<i>", reason:"index-only; harder to debug which methods were applied", reason_zh:"僅編號；難 debug 用了哪些 method" },
+            { name:"<stem>_<Method> (subject Part 2 style)", reason:"only fits K=1; doesn't encode 2 methods", reason_zh:"只適合 K=1；無法編碼 2 個 method" }
+          ] },
+
+        { id:10, question:"Augmentor interface shape",
+          question_zh:"Augmentor 介面樣貌",
+          adopted:"class-based: Augmentor(pool, seed).apply(image)",
+          adopted_zh:"class 介面：Augmentor(pool, seed).apply(image)",
+          status:"resolved", dependsOn:1, premise:"K=2 random subset",
+          rejected:[
+            { name:"pure functional API", reason:"parameter-heavy at call sites; harder to thread state", reason_zh:"呼叫端參數冗長；難以維持狀態" }
+          ] },
+
+        { id:11, question:"Seed handling",
+          question_zh:"Seed 處理",
+          adopted:"CLI --seed 42 default; None = stochastic",
+          adopted_zh:"CLI --seed 42 預設；None 為隨機",
+          status:"resolved", dependsOn:5, premise:"seeded RNG",
+          rejected:[
+            { name:"no seed exposure", reason:"MVP runs must be reproducible for teammates", reason_zh:"MVP 結果需可重現給組員" }
+          ] }
+      ],
+      edges: [
+        { from:8, to:9, kind:"feeds", label:"method names ／ 方法名稱來自 pool" }
+      ]
+    };
+    // ===========================================================================
+    //  Reusable renderer — do not edit per session.
+    // ===========================================================================
+    const NW = 250, NH = 124, COL_W = 320, ROW_H = 164, PAD = 28;
+    const EKIND = {
+      backbone:   { color:"#475569", dash:"none" },
+      feeds:      { color:"#a78bfa", dash:"6 5" },
+      supersedes: { color:"#fbbf24", dash:"6 5" },
+      failure:    { color:"#fb7185", dash:"6 5" }
+    };
+
+    function layout() {
+      const byId = {}; GRAPH.nodes.forEach(n => byId[n.id] = n);
+      const layerOf = {};
+      function depth(n) {
+        if (layerOf[n.id] != null) return layerOf[n.id];
+        return layerOf[n.id] = (n.dependsOn == null ? 0 : depth(byId[n.dependsOn]) + 1);
+      }
+      GRAPH.nodes.forEach(depth);
+      const layers = {};
+      GRAPH.nodes.forEach(n => (layers[layerOf[n.id]] ||= []).push(n));
+      Object.values(layers).forEach(col => col.sort((a,b)=>a.id-b.id));
+      const pos = {};
+      Object.keys(layers).forEach(L => layers[L].forEach((n,row) => {
+        pos[n.id] = { x: PAD + L*COL_W, y: PAD + row*ROW_H };
+      }));
+      const cols = Object.keys(layers).length;
+      const rows = Math.max(...Object.values(layers).map(c=>c.length));
+      const gutter = GRAPH.edges.length ? 190 : 0;
+      return { byId, pos, layerOf, width: PAD*2 + (cols-1)*COL_W + NW + gutter, height: PAD*2 + (rows-1)*ROW_H + NH };
+    }
+
+    function edgePath(a, b, kind) {
+      if (kind === "backbone") {
+        const x1=a.x+NW, y1=a.y+NH/2, x2=b.x, y2=b.y+NH/2, dx=(x2-x1)/2;
+        return `M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}`;
+      }
+      const x1=a.x+NW, y1=a.y+NH/2, x2=b.x+NW, y2=b.y+NH/2, cx=Math.max(x1,x2)+Math.max(48,Math.abs(y2-y1)/2);
+      return `M${x1},${y1} C${cx},${y1} ${cx},${y2} ${x2},${y2}`;
+    }
+
+    function render() {
+      document.getElementById('title').textContent = META.title;
+      const { byId, pos, width, height } = layout();
+      const stage = document.getElementById('stage');
+      const svg = document.getElementById('edges');
+      svg.setAttribute('width', width); svg.setAttribute('height', height);
+      svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      stage.style.width = width + 'px'; stage.style.height = height + 'px';
+
+      let defs = '<defs>';
+      Object.entries(EKIND).forEach(([k,v]) =>
+        defs += `<marker id="ah-${k}" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="${v.color}"/></marker>`);
+      defs += '</defs>';
+      let paths = '';
+      const allEdges = GRAPH.nodes.filter(n=>n.dependsOn!=null).map(n=>({from:n.dependsOn,to:n.id,kind:"backbone",label:"assumed:"+(n.premise||"")}))
+        .concat(GRAPH.edges);
+      allEdges.forEach(e => {
+        const a=pos[e.from], b=pos[e.to], v=EKIND[e.kind]; if(!a||!b) return;
+        paths += `<path d="${edgePath(a,b,e.kind)}" fill="none" stroke="${v.color}" stroke-width="1.6" stroke-dasharray="${v.dash}" marker-end="url(#ah-${e.kind})" opacity="${e.kind==='backbone'?0.9:0.85}"/>`;
+        if (e.label && e.kind!=='backbone') {
+          const y1=a.y+NH/2, y2=b.y+NH/2, cx=Math.max(a.x,b.x)+NW+Math.max(48,Math.abs(y2-y1)/2);
+          const my=(y1+y2)/2, w=e.label.length*5.4+10;
+          paths += `<rect x="${cx-w/2}" y="${my-8}" width="${w}" height="14" rx="3" fill="#0b1220" stroke="${v.color}" stroke-opacity="0.4"/>`;
+          paths += `<text x="${cx}" y="${my+2}" fill="${v.color}" font-size="9" text-anchor="middle" font-family="JetBrains Mono">${e.label}</text>`;
+        }
+      });
+      svg.innerHTML = defs + paths;
+
+      GRAPH.nodes.forEach(n => {
+        const p = pos[n.id];
+        const el = document.createElement('div');
+        el.className = 'node ' + (n.status||'resolved');
+        el.style.left = p.x + 'px'; el.style.top = p.y + 'px';
+        const rej = (n.rejected||[]);
+        el.innerHTML =
+          `<span class="idbadge">#${n.id}</span>` +
+          `<div class="q">${n.question}${n.question_zh?`<span class="qzh">${n.question_zh}</span>`:''}</div>` +
+          (n.adopted ? `<div class="adopted">✅ ${n.adopted}${n.adopted_zh?`<span class="azh"> · ${n.adopted_zh}</span>`:''}</div>` : '') +
+          (rej.length ? `<div class="rejcount">❌ ${rej.length} rejected · hover 展開</div>` : '') +
+          `<div class="detail">` +
+            (n.premise ? `<div class="premise">depends on <b>${n.premise}</b></div>` : '') +
+            (rej.length ? `<div class="rej-title">Rejected · 否決</div>` + rej.map(r=>`<div class="rej"><b>${r.name}</b> — ${r.reason}${r.reason_zh?`<br><span style="color:#94a3b8">${r.reason_zh}</span>`:''}</div>`).join('') : '<div class="rej">No rejected options recorded.</div>') +
+          `</div>`;
+        stage.appendChild(el);
+      });
+    }
+    render();
+
+    // ===========================================================================
+    //  Export toolbar — html2canvas + jsPDF.
+    // ===========================================================================
+    function capture() {
+      const el = document.getElementById('report-container'); const r = el.getBoundingClientRect(); const pad = 32;
+      return html2canvas(document.body, { backgroundColor:'#020617', scale:2, useCORS:true,
+        ignoreElements:(e)=>e.classList&&e.classList.contains('toolbar'),
+        x:r.left+scrollX-pad, y:r.top+scrollY-pad, width:r.width+pad*2, height:r.height+pad*2 });
+    }
+    async function copyAsImage(btn){ const o=btn.textContent; try{ const c=await capture(); const b=await new Promise(r=>c.toBlob(r,'image/png')); await navigator.clipboard.write([new ClipboardItem({'image/png':b})]); btn.textContent='✓ Copied!'; }catch(e){ btn.textContent='✗ Failed'; } setTimeout(()=>btn.textContent=o,2000); }
+    async function downloadPNG(btn){ const o=btn.textContent; btn.textContent='⏳ ...'; try{ const c=await capture(); const a=document.createElement('a'); a.download='decision-graph.png'; a.href=c.toDataURL('image/png'); a.click(); btn.textContent='✓ Done!'; }catch(e){ btn.textContent='✗ Failed'; } setTimeout(()=>btn.textContent=o,2000); }
+    async function downloadPDF(btn){ const o=btn.textContent; btn.textContent='⏳ ...'; try{ const c=await capture(); const img=c.toDataURL('image/png'); const {jsPDF}=window.jspdf; const orient=c.width>c.height?'landscape':'portrait'; const pdf=new jsPDF({orientation:orient,unit:'px',format:[c.width,c.height],hotfixes:['px_scaling']}); pdf.addImage(img,'PNG',0,0,c.width,c.height); pdf.save('decision-graph.pdf'); btn.textContent='✓ Done!'; }catch(e){ btn.textContent='✗ Failed'; } setTimeout(()=>btn.textContent=o,2000); }
+  </script>
+</body>
+</html>
