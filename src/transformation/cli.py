@@ -83,58 +83,58 @@ def _to_parsed_args(
 def run(
     src: Path = typer.Option(
         DEFAULT_SOURCE,
-        "-src",
+        "-s",
         "--src",
         help="Source image file or directory "
         f"(default: {DEFAULT_SOURCE})",
     ),
     dst: Path | None = typer.Option(
         None,
-        "-dst",
+        "-d",
         "--dst",
         help="Destination directory for outputs "
         f"(default: {DEFAULT_DST}/<transform>; "
-        "omit with a single -src image to show previews)",
+        "omit with a single source image to show previews)",
     ),
     all_transforms: bool = typer.Option(
         False,
-        "-all",
+        "-a",
         "--all",
         help="Run all transformations (default when none are selected)",
     ),
     blur: bool = typer.Option(
         False,
-        "-blur",
+        "-b",
         "--blur",
         help="Run the blur transformation",
     ),
     mask: bool = typer.Option(
         False,
-        "-mask",
+        "-m",
         "--mask",
         help="Run the mask transformation",
     ),
     roi: bool = typer.Option(
         False,
-        "-roi",
+        "-r",
         "--roi",
         help="Run the roi transformation",
     ),
     analyze: bool = typer.Option(
         False,
-        "-analyze",
+        "-anlz",
         "--analyze",
         help="Run the analyze transformation",
     ),
     pseudolandmarks: bool = typer.Option(
         False,
-        "-pseudolandmarks",
+        "-pl",
         "--pseudolandmarks",
         help="Run the pseudolandmarks transformation",
     ),
     histogram: bool = typer.Option(
         False,
-        "-histogram",
+        "-g",
         "--histogram",
         help="Run the histogram transformation",
     ),
