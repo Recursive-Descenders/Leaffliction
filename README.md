@@ -31,6 +31,13 @@ Creates **`.venv`**, applies **`uv.lock`**, and installs deps (including **flake
 | `uv run tr`    | `train.py`         |
 | `uv run pr`    | `predict.py`       |
 
+### Code layout
+
+Same pattern for every module:
+
+1. **`typer`** for flags — keep each top-level `*.py` entry file thin (parse args, then call your code).
+2. **Entry + folder** — logic lives in a package under `src/`, not in the entry file (e.g. `Transformation.py` → `transformation/`).
+3. **Outputs** — if you save to the repo, use `outputs/<module>/` (`outputs/distribution/`, `outputs/augmentation/`, `outputs/transformation/`, …). Follow the subject when it says otherwise.
 
 ### flake8
 

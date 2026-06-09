@@ -3,6 +3,9 @@ en.subject.txt
 leaves/*
 PR.md
 
+# Generated outputs
+outputs/
+
 # Python / uv
 .venv/
 __pycache__/
