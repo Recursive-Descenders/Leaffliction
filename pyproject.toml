@@ -11,6 +11,7 @@ dependencies = [
     "opencv-python",
     "plantcv",
     "tqdm>=4.67.0",
+    "typer>=0.12",
 ]
 
 [project.scripts]
@@ -24,6 +25,7 @@ pr = "predict:main"
 dev = [
     "flake8>=7.3.0",
     "opencv-stubs>=0.1.3",
+    "pytest>=8.0",
 ]
 
 [tool.setuptools]
