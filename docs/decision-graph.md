@@ -34,17 +34,20 @@
 - **Premise it depends on**: #1 = K=2 composition. If composition strategy changes (e.g., back to single transform), magnitude bounds can loosen.
 
 ### #3 — Scope: at what input level does the augmentor operate?
-- **Status**: resolved
-- **Adopted**: **D — A+B+C sharing one K=2 core.** Three CLI entry points all wrap the same `Augmentor.apply(image) → image` core:
-  - **A** single-image CLI (replaces current `Augmentation.py` 6-fixed-output behavior with `--n` K=2 outputs).
-  - **B** single class folder (`aug-class apple_rust/ --target 1640`).
-  - **C** dataset root (`aug-dataset data/raw/Apple/ --balance` → all classes up to max).
+- **Status**: resolved (re-assumed post-MVP — see #3')
+- **Adopted**: **D — A+B+C sharing one K=2 core.** Three CLI entry points all wrap the same `Augmentor.apply(image) → image` core.
 - **Rejected**:
   - **A only** — kills B/C, can't balance 6× imbalance.
   - **B only** — works but requires manual loop per class.
   - **C only** — loses demo / debugging capability needed for subject Part 2.
 - **Premise**: builds on #1 (K=2 composition is the shared core).
-- **Refactor cost**: existing `Augmentation.py` switches from "6 fixed outputs, one per method" to "N outputs, each = K=2 random transforms". The current `METHODS` list in `visualization.py` stays for the interactive viewer.
+
+### #3' — Unified `aug PATH` CLI (supersedes #3's three-entry surface)
+- **Status**: resolved (active)
+- **Adopted**: **Single `aug PATH` command that dispatches on path type.** `path.is_file()` → mode A; `path` is a class folder (directly contains images) → mode B; `path` is a dataset root (contains class sub-folders) → mode C. The shared K=2 core is unchanged; only the user-facing surface collapsed.
+- **Rejected**:
+  - Original three named entries (`aug` / `aug-class` / `aug-dataset`) — extra mental overhead; path type encodes the mode unambiguously and end-users already know whether they hold an image or a directory.
+- **Premise**: behavior of #3 is preserved; the three-mode architecture is unaffected.
 
 ### #8 — Method pool composition
 - **Status**: resolved (marked **revisit-planned** — see Open Risks)
@@ -112,19 +115,19 @@
 
 ---
 
-### #7 — Train/val split timing
-- **Status**: resolved
-- **Adopted**: **IV — split is a separate CLI (`split`); augmentor only operates on `train/`.** Pipeline:
-  ```
-  split data/raw/Apple/ --val 0.2     → data/train/, data/val/
-  aug-dataset data/train/ --balance   → data/train/ filled to max class
-  ```
+### #7 — Train/val split timing — **STALE (superseded post-MVP)**
+- **Status**: stale (superseded by #7')
+- **Original adopted**: IV — split is a separate CLI (`split`); augmentor only operates on `train/`.
+- **Original rejected**: I (augment-all then split → DATA LEAK), II (monolithic split-then-augment), III (augmentor handles split internally).
+- **Why superseded**: end-user is assumed to have already split their dataset before invoking the augmentor. Removing the `split` CLI eliminates a tool we don't own a UX for, and keeps the augmentor's surface area minimal.
+
+### #7' — Pre-split input assumption (supersedes #7)
+- **Status**: resolved (active)
+- **Adopted**: **augmentor assumes input is already split.** The user passes the train side (single image / class folder / dataset root) to `aug`; val never enters the augmentor. No `split` CLI ships.
 - **Rejected**:
-  - **I** (augment-all then split) — DATA LEAK: augmented copies of the same source can land in both splits.
-  - **II** (split then augment train, monolithic) — correct but couples concerns.
-  - **III** (augmentor handles split internally via `--val 0.2`) — convenient one-liner but implicit; risk of re-splitting on every re-run breaks val-set stability across experiments.
-- **Premise**: builds on #3 (mode C dataset-level).
-- **Open sub-detail**: split strategy (stratified per-class vs random) — default stratified (ML common sense), not grilled. Reopen as `#7b` if needed.
+  - Ship `split` CLI anyway — extra surface area for a task the end-user already handles (or has a preferred external tool for); removing it cuts code + tests + docs.
+- **Premise**: builds on #3' (unified CLI) and reuses the leak-safety principle from #7 (augmentor must not touch val), enforced by user convention instead of a tool boundary.
+- **Note**: the leak hazard #7 originally guarded against still exists if a user points `aug` at an un-split dataset — but that's a usage error, no longer a tool design concern.
 
 ---
 
@@ -132,10 +135,12 @@
 
 - `#1 --assumed:K=2 random subset--> #2`
 - `#1 --assumed:K=2 random subset--> #3`
+- `#3 -.supersedes.-> #3'` (unified CLI surface)
 - `#3 --assumed:dataset mode C--> #4`
 - `#4 --assumed:match max class count--> #5`
 - `#3 --assumed:dataset mode C--> #6`
-- `#3 --assumed:dataset mode C--> #7`
+- `#3 --assumed:dataset mode C--> #7` (stale)
+- `#7 -.supersedes.-> #7'` (pre-split assumption)
 - `#1 --assumed:K=2 random subset--> #8`
 - `#1 --assumed:K=2 random subset--> #9` (filename encodes 2 methods)
 - `#8 --assumed:method names from pool--> #9`
@@ -150,21 +155,25 @@
 graph TD
   N1["#1 composition strategy<br/>✅ K=2 random subset"]:::active
   N2["#2 calibration<br/>✅ literature + EDA heuristic<br/>⚠️ revisit-candidate"]:::active
-  N3["#3 scope<br/>✅ A+B+C share K=2 core"]:::active
+  N3["#3 scope<br/>(superseded by #3')"]:::stale
+  N3p["#3' unified CLI<br/>✅ aug PATH dispatches by type"]:::active
   N4["#4 balance target<br/>✅ match max class count"]:::active
   N5["#5 source sampling<br/>✅ round-robin + seeded RNG"]:::active
   N6["#6 dedup pre-step<br/>✅ YES, exact file-hash"]:::active
-  N7["#7 train/val split timing<br/>✅ separate split CLI"]:::active
+  N7["#7 split timing<br/>(superseded by #7')"]:::stale
+  N7p["#7' pre-split input<br/>✅ user splits externally; no split CLI"]:::active
   N8["#8 method pool<br/>✅ geometric-only (MVP)<br/>⚠️ revisit-planned"]:::active
   N9["#9 filename<br/>✅ stem_M1_M2_i.ext"]:::active
   N10["#10 interface<br/>✅ Augmentor class"]:::active
   N11["#11 seed<br/>✅ --seed 42 default"]:::active
   N1 -->|"assumed:K=2 random subset"| N2
   N1 -->|"assumed:K=2 random subset"| N3
+  N3 -.supersedes.-> N3p
   N3 -->|"assumed:dataset mode C"| N4
   N4 -->|"assumed:match max"| N5
   N3 -->|"assumed:dataset mode C"| N6
   N3 -->|"assumed:dataset mode C"| N7
+  N7 -.supersedes.-> N7p
   N1 -->|"assumed:K=2 random subset"| N8
   N1 -->|"assumed:K=2"| N9
   N8 -->|"assumed:pool methods"| N9

@@ -124,13 +124,22 @@
 
         { id:3, question:"Scope: at what input level does the augmentor operate?",
           question_zh:"範圍：augmentor 處理什麼層級輸入？",
-          adopted:"D — A+B+C share one K=2 core",
-          adopted_zh:"D — A+B+C 共用一個 K=2 core",
-          status:"resolved", dependsOn:1, premise:"K=2 random subset",
+          adopted:"D — A+B+C share one K=2 core (CLI surface superseded by #3')",
+          adopted_zh:"D — A+B+C 共用 K=2 core（CLI 介面已被 #3' 取代）",
+          status:"stale", dependsOn:1, premise:"K=2 random subset",
           rejected:[
             { name:"A only — single-image CLI", reason:"kills B/C; can't balance 6× imbalance", reason_zh:"扼殺 B/C；無法平衡 6× 不平衡" },
             { name:"B only — class folder", reason:"requires manual loop per class", reason_zh:"需要對每個 class 手動迴圈" },
             { name:"C only — dataset root", reason:"loses demo / debugging capability", reason_zh:"失去 demo / debugging 能力" }
+          ] },
+
+        { id:31, question:"Unified `aug PATH` CLI (supersedes #3 surface)",
+          question_zh:"統一 `aug PATH` CLI（取代 #3 的介面）",
+          adopted:"Single `aug PATH` — dispatches on path type (file / class folder / dataset root)",
+          adopted_zh:"單一 `aug PATH` —— 依路徑型別分流（檔案 / class 資料夾 / dataset root）",
+          status:"resolved", dependsOn:3, premise:"three named CLI entries (#3 D)",
+          rejected:[
+            { name:"Three named entries (aug / aug-class / aug-dataset)", reason:"extra mental overhead; path type already encodes the mode", reason_zh:"額外的記憶負擔；path 型別已能明確指定模式" }
           ] },
 
         { id:4, question:"Balance target: how to define 'balanced' per class?",
@@ -166,13 +175,22 @@
 
         { id:7, question:"Train/val split timing relative to augmentation",
           question_zh:"Train/val split 與 augmentation 的順序",
-          adopted:"IV — separate split CLI; augmentor only sees train/",
-          adopted_zh:"IV — split 為獨立 CLI；augmentor 只看 train/",
-          status:"resolved", dependsOn:3, premise:"dataset mode C",
+          adopted:"IV — separate split CLI (superseded by #7')",
+          adopted_zh:"IV — 獨立 split CLI（已被 #7' 取代）",
+          status:"stale", dependsOn:3, premise:"dataset mode C",
           rejected:[
             { name:"I — augment-then-split", reason:"DATA LEAK: augmented copies span train and val", reason_zh:"資料外洩：同源增強副本橫跨 train 與 val" },
             { name:"II — monolithic split-then-augment", reason:"correct but couples concerns", reason_zh:"邏輯正確但耦合過深" },
             { name:"III — augmentor handles split internally", reason:"implicit; re-splits each run, breaks val-set stability", reason_zh:"隱式行為；每次執行重新切，破壞 val 穩定" }
+          ] },
+
+        { id:71, question:"Pre-split input assumption (supersedes #7)",
+          question_zh:"輸入已預先 split 的前提（取代 #7）",
+          adopted:"User pre-splits; no `split` CLI ships",
+          adopted_zh:"使用者預先 split；不附帶 `split` CLI",
+          status:"resolved", dependsOn:7, premise:"separate split CLI (#7 IV)",
+          rejected:[
+            { name:"Ship `split` CLI anyway", reason:"extra surface for a task end-users already handle externally; removing it cuts code + tests + docs", reason_zh:"為 end-user 已有自身做法的任務增加表面積；移除可省 code/測試/文件" }
           ] },
 
         { id:8, question:"Method pool composition",

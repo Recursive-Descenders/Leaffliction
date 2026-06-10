@@ -16,8 +16,6 @@ dependencies = [
 [project.scripts]
 dist = "Distribution:main"
 aug = "Augmentation:main"
-aug-dataset = "AugDataset:main"
-split = "Split:main"
 xfm = "Transformation:main"
 tr = "train:main"
 pr = "predict:main"
@@ -33,8 +31,6 @@ package-dir = { "" = "src" }
 py-modules = [
     "Distribution",
     "Augmentation",
-    "AugDataset",
-    "Split",
     "Transformation",
     "train",
     "predict",

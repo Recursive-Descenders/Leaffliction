@@ -37,13 +37,13 @@ Take RandAugment / Albumentations defaults; tighten per EDA group:
 
 Rejected: `a` manual-only (slow, subjective), `b` full K=2 stress test (O(N²) overkill pre-training), `c` classifier-feedback (chicken-and-egg + bias risk), `e` recommended hybrid (deferred for MVP simplicity).
 
-#### #3 — Scope: A+B+C share one K=2 core
-Three CLI entry points wrap the same `Augmentor.apply(image)` core:
-- **A** `aug image.jpg --n 5` — single image, 5 K=2 outputs (replaces subject Part 2 fixed-6-output behavior).
-- **B** `aug-class apple_rust/ --target 1640` — single class folder fill-to-target.
-- **C** `aug-dataset data/train/ --balance` — dataset root, balance all classes to max.
+#### #3 / #3' — Scope: A+B+C behavior, **unified `aug PATH` CLI**
+The three behavioural modes (A single-image / B class-folder / C dataset-root) share one Augmentor core and now sit behind a single command that dispatches on path type:
+- `aug image.jpg --n 5` — image file → mode A, 5 K=2 outputs.
+- `aug apple_rust/ --target 1640` — class folder → mode B, fill to target.
+- `aug data/train/Apple/ --balance` — dataset root → mode C, balance all classes to max.
 
-Rejected: A-only / B-only / C-only — each kills another mode's use case.
+#3 originally proposed three named CLI entries (`aug` / `aug-class` / `aug-dataset`); #3' supersedes that by collapsing them — the path type already encodes the mode unambiguously and end-users already know whether they hold an image or a directory.
 
 ### Dataset-level decisions (mode C)
 
@@ -60,10 +60,10 @@ Deterministic floor + remainder: `floor(need / N_sources)` per source, first `ne
 SHA-256 / MD5 byte-hash dedup runs before any pipeline stage. EDA C2 found 7 pairs in `apple_healthy/`; without dedup their augmented copies inherit duplicate weight.
 - Sub-detail `#6b` (perceptual / near-dup hash) deferred — reopen if exact-hash misses real near-dups.
 
-#### #7 — Train/val split timing: separate `split` CLI
-Pipeline composition: `split data/raw/Apple/ --val 0.2` → `data/train/`, `data/val/`; then `aug-dataset data/train/ --balance` only augments train.
-- Rejected `I` augment-then-split (DATA LEAK risk), `II` monolithic (couples concerns), `III` augmentor-handles-split-internally (re-splits on every run, breaks val-set stability across experiments).
-- Sub-detail: split is stratified per-class (ML common sense default, not grilled).
+#### #7 / #7' — Pre-split input assumption (no `split` CLI)
+The augmentor assumes input is already split by the user — they pass the train side (image / class folder / dataset root) and val never enters the pipeline. The leak hazard #7 originally guarded against (augmented copies spanning train and val) is now a usage-error concern rather than a tool design concern, traded for a smaller surface area.
+
+#7 originally shipped a `split` CLI as a separate step; #7' supersedes that by dropping the tool entirely. End-users already have a preferred way to split a dataset; we don't own that UX.
 
 ### Pool and interface details
 
@@ -89,44 +89,42 @@ Default seeded for reproducible MVP runs; `None` opts into stochastic.
 
 ## Implementation Skeleton
 
-Recommended directory layout (matches existing `src/augmentation/` structure):
+Actual layout shipped:
 
 ```
-src/augmentation/
-  __init__.py
-  core.py              # Augmentor class (#10) — pool + seeded RNG + K=2 apply (#1)
-  registry.py          # POOL list of Method dataclasses (#8) — magnitudes from #2
-  methods/
+src/
+  Augmentation.py      # single `aug PATH` CLI — dispatches by path type (#3' + #11)
+  augmentation/
     geometric.py       # existing 6 methods (flip / rotate / shear / skew / crop / radial_distortion)
-    photometric.py     # future home for color_jitter (S3 → triggers #8 revisit-planned)
-  cli/
-    single.py          # mode A entry: aug image.jpg --n 5 --seed 42        (#3 + #11)
-    class_dir.py       # mode B entry: aug-class apple_rust/ --target 1640   (#3)
-    dataset.py         # mode C entry: aug-dataset data/train/ --balance     (#3 + #4)
-    split.py           # mode IV split entry: split data/raw/Apple/ --val 0.2 (#7)
-  preprocess/
-    dedup.py           # exact file-hash dedup (#6)
-  io.py                # filename builder: <stem>_<Method1>_<Method2>_<i>.<ext> (#9)
+    registry.py        # POOL of Method dataclasses (#8) — magnitudes from #2
+    core.py            # Augmentor class (#10) — pool + seeded RNG + K=2 apply (#1)
+    preprocess.py      # exact file-hash dedup + image listing (#6)
+    util.py            # build_aug_output_path (#9) + load/save helpers
+    visualization.py   # interactive matplotlib viewer (orthogonal, dev-only)
+tests/
+  test_geometric.py
+  test_augmentor.py    # POOL composition, K=2 reproducibility, filename, dedup
 ```
 
-### Mode C control flow
+Per #7' there is no separate `split` CLI — users are expected to pre-split their dataset before invoking `aug`.
+
+### Mode C control flow (dataset root)
 
 ```
-1. (Optional pre-step) dedup data/train/                              [#6]
-2. For each class folder in data/train/:                              [#3 mode C]
-     count = len(images)
-     need  = max_class_count - count                                  [#4]
+1. For each class folder under data_dir:                              [#3' mode C]
+     paths      = list_images(class_folder)
+     kept, dup  = dedup_images(paths)                                 [#6]
+     need       = target - len(kept)                                  [#4]
      if need <= 0: continue
-     per_source = need // count
-     remainder  = need % count
-     for i, source in enumerate(sorted(images)):                      [#5 round-robin]
+     per_source = need // len(kept)
+     remainder  = need % len(kept)
+     for i, source in enumerate(kept):                                [#5 round-robin]
          copies = per_source + (1 if i < remainder else 0)
          for k in range(copies):
-             image = load(source)
+             image     = load(source)
              augmented = augmentor.apply(image)                       [#1 + #10]
-             # augmentor internally picks K=2 methods from POOL, applies
-             # each at a random magnitude within its calibrated range  [#2 + #8]
-             out_name = build_name(source, augmentor.last_methods, k) [#9]
+             out_name  = build_aug_output_path(source,                [#9]
+                            augmentor.last_methods, k)
              save(augmented, class_folder / out_name)
 ```
 

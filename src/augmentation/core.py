@@ -43,6 +43,10 @@ class Augmentor:
         indices = self._rng.choice(len(self.pool), size=K, replace=False)
         methods = [self.pool[i] for i in indices]
 
+        # Reseed global numpy RNG from our seeded RNG so any method using
+        # np.random.* (e.g., apply_crop's random offset) stays reproducible.
+        np.random.seed(int(self._rng.integers(0, 2**31 - 1)))
+
         result = image
         for method in methods:
             kwargs = {
