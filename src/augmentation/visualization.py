@@ -81,11 +81,7 @@ METHODS: list[Method] = [
     Method(
         "distortion",
         "Distortion",
-        # apply_radial_distortion takes a tuple ``k_range``; wrap so the two sliders
-        # can be passed by name and joined into that tuple at call time.
-        lambda image, k: apply_radial_distortion(
-            image, k
-        ),
+        apply_radial_distortion,
         [
             ParamSpec("k", "k", 0.0, 0.5, 0.3, 0.01),
         ],
@@ -122,7 +118,7 @@ class AugmentationViewer:
         self.radio = RadioButtons(
             self.ax_radio, [method.label for method in METHODS]
         )
-        self.radio.on_clicked(self._on_method_label) # type: ignore
+        self.radio.on_clicked(self._on_method_label)  # type: ignore
 
         # Placeholder text shown when the selected method is not implemented.
         self.message = self.figure.text(

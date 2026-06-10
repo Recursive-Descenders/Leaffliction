@@ -19,7 +19,10 @@ def make_test_image(size: int = 400) -> np.ndarray:
             if (i + j) % 2 == 0:
                 img[j*cell:(j+1)*cell, i*cell:(i+1)*cell] = (235, 230, 222)
 
-    LEAF, VEIN, CORNER, STEM = (78, 184, 106), (32, 96, 45), (48, 64, 208), (48, 90, 138)
+    LEAF = (78, 184, 106)
+    VEIN = (32, 96, 45)
+    CORNER = (48, 64, 208)
+    STEM = (48, 90, 138)
     PATTERN = [
         [3, 0, 0, 1, 1, 0, 0, 0],
         [0, 0, 1, 1, 1, 1, 0, 0],
@@ -64,6 +67,23 @@ def build_output_path(
     out_dir = Path(dst) if dst is not None else image_path.parent
     out_dir.mkdir(parents=True, exist_ok=True)
     return out_dir / f"{image_path.stem}_{name}{image_path.suffix}"
+
+
+def build_aug_output_path(
+    image_path: str | Path,
+    methods: tuple[str, ...],
+    index: int,
+    dst: str | Path | None = None,
+) -> Path:
+    """Return ``<stem>_<Method1>_<Method2>_<i><suffix>`` per decision #9.
+
+    ``methods`` lists the augmentation methods in the order they were applied.
+    """
+    image_path = Path(image_path)
+    out_dir = Path(dst) if dst is not None else image_path.parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+    suffix = "_".join(methods)
+    return out_dir / f"{image_path.stem}_{suffix}_{index}{image_path.suffix}"
 
 
 def save_image(image: np.ndarray, path: str | Path) -> Path:

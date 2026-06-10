@@ -1,26 +1,27 @@
 #!/usr/bin/env python3
 """
-Augmentation CLI.
+Augmentation CLI — mode A (single image).
 
-Takes a single image, applies every *implemented* geometric augmentation,
-and writes each result next to the others in an output directory using the
-subject naming rule ``<stem>_<Method><suffix>``.
-
-Methods that are not implemented yet (they raise ``NotImplementedError``)
-are skipped, so the set of outputs grows automatically as more transforms
-land — no change needed here.
+Produces ``n`` augmented variants of a single source image by running it
+through the K=2 Augmentor: each output is the composition of two random
+methods drawn from the pool, applied at calibrated safe magnitudes.
 
     uv run aug "data/raw/Apple/apple_healthy/image (1).JPG"
-    ./src/Augmentation.py "data/raw/Apple/apple_healthy/image (1).JPG"
+    uv run aug "image.jpg" --n 5 --seed 42
+
+The output filename encodes the two methods in call-order (decision #9):
+``<stem>_<Method1>_<Method2>_<i><ext>``.
 """
 from pathlib import Path
 
 import typer
 
-from augmentation.util import build_output_path, load_image, save_image
-from augmentation.visualization import METHODS
+from augmentation.core import default_augmentor
+from augmentation.util import build_aug_output_path, load_image, save_image
 
 DEFAULT_DST = Path("data/augmented_directory")
+DEFAULT_N = 6
+DEFAULT_SEED = 42
 
 
 def augment(
@@ -38,24 +39,33 @@ def augment(
         "-d",
         help="Directory the augmented images are written to.",
     ),
+    n: int = typer.Option(
+        DEFAULT_N,
+        "--n",
+        "-n",
+        min=1,
+        help="Number of K=2 augmented outputs to produce.",
+    ),
+    seed: int = typer.Option(
+        DEFAULT_SEED,
+        "--seed",
+        "-s",
+        help="RNG seed for reproducibility. Negative = stochastic run.",
+    ),
 ) -> None:
-    """Apply every implemented augmentation and save the results."""
+    """Produce ``n`` K=2 augmented variants of the source image."""
     image = load_image(image_path)
+    augmentor = default_augmentor(seed=seed if seed >= 0 else None)
 
-    saved: list[Path] = []
-    for method in METHODS:
-        defaults = {spec.name: spec.default for spec in method.params}
-        try:
-            result = method.func(image, **defaults)
-        except NotImplementedError:
-            typer.echo(f"skip  {method.label} (not implemented yet)")
-            continue
-        out_path = build_output_path(image_path, method.label, dst=dst)
+    for i in range(n):
+        result = augmentor.apply(image)
+        out_path = build_aug_output_path(
+            image_path, augmentor.last_methods, i, dst=dst
+        )
         save_image(result, out_path)
-        saved.append(out_path)
         typer.echo(f"saved {out_path}")
 
-    typer.echo(f"\n{len(saved)} augmented image(s) written to {dst}")
+    typer.echo(f"\n{n} augmented image(s) written to {dst}")
 
 
 def main() -> None:
