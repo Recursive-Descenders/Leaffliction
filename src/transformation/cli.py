@@ -13,6 +13,7 @@ TRANSFORM_FLAGS = (
     "analyze",
     "pseudolandmarks",
     "histogram",
+    "spot_mask",
 )
 
 
@@ -52,6 +53,7 @@ def _to_parsed_args(
     analyze: bool,
     pseudolandmarks: bool,
     histogram: bool,
+    spot_mask: bool,
 ) -> ParsedArgs:
     resolved_src, file = _resolve_source(src)
     resolved_dst = _resolve_destination(dst) if dst is not None else None
@@ -65,6 +67,7 @@ def _to_parsed_args(
             ("analyze", analyze),
             ("pseudolandmarks", pseudolandmarks),
             ("histogram", histogram),
+            ("spot_mask", spot_mask),
         )
         if enabled
     }
@@ -138,6 +141,12 @@ def run(
         "--histogram",
         help="Run the histogram transformation",
     ),
+    spot_mask: bool = typer.Option(
+        False,
+        "-sm",
+        "--spot-mask",
+        help="Run the spot mask transformation",
+    ),
 ) -> None:
     args = _to_parsed_args(
         src=src,
@@ -149,6 +158,7 @@ def run(
         analyze=analyze,
         pseudolandmarks=pseudolandmarks,
         histogram=histogram,
+        spot_mask=spot_mask,
     )
 
     from Transformation import run_transformations

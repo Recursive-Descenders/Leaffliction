@@ -17,6 +17,16 @@ _REFINED_CLOSE_KERNEL = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
 CONTOUR_COLOR = (0, 255, 0)
 CONTOUR_THICKNESS = 2
 EDGE_MARGIN = 3
+SHADOW_V_MAX = 30
+SHADOW_S_MAX = 45
+
+
+@dataclass(frozen=True)
+class LeafMaskRecord:
+    mask: np.ndarray
+    leaf_solidity: float
+    mask_area_ratio: float
+    border_touch_ratio: float
 
 
 @dataclass(frozen=True)
@@ -59,6 +69,16 @@ def build_mask(image: np.ndarray) -> np.ndarray:
     return mask_image
 
 
+def _shadow_like_mask(image: np.ndarray) -> np.ndarray:
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    s_channel = hsv[:, :, 1]
+    v_channel = hsv[:, :, 2]
+    return (
+        (v_channel <= SHADOW_V_MAX)
+        & (s_channel <= SHADOW_S_MAX)
+    )
+
+
 def build_refined_mask(image: np.ndarray) -> np.ndarray:
     """HSV seed + GrabCut for centered leaves on gray background."""
     hsv_mask = build_mask(image)
@@ -82,6 +102,12 @@ def build_refined_mask(image: np.ndarray) -> np.ndarray:
         margin_x:width - margin_x,
     ]
     inner[inner_hsv > 0] = cv2.GC_PR_FGD
+    shadow_like = _shadow_like_mask(image)
+    inner_shadow = shadow_like[
+        margin_y:height - margin_y,
+        margin_x:width - margin_x,
+    ]
+    inner[inner_shadow] = cv2.GC_PR_BGD
 
     center_y, center_x = height // 2, width // 2
     seed = 25
@@ -117,6 +143,7 @@ def build_refined_mask(image: np.ndarray) -> np.ndarray:
         255,
         0,
     ).astype(np.uint8)
+    refined[shadow_like] = 0
     refined = cv2.morphologyEx(refined, cv2.MORPH_OPEN, _OPEN_KERNEL)
     return cv2.morphologyEx(refined, cv2.MORPH_CLOSE, _REFINED_CLOSE_KERNEL)
 
@@ -213,7 +240,7 @@ def _draw_contour_overlay(
     return overlay
 
 
-def evaluate_leaf_mask(image: np.ndarray) -> LeafMaskResult | None:
+def compute_leaf_mask_record(image: np.ndarray) -> LeafMaskRecord | None:
     leaf_mask = largest_leaf_mask(build_refined_mask(image))
     if leaf_mask is None:
         return None
@@ -226,13 +253,30 @@ def evaluate_leaf_mask(image: np.ndarray) -> LeafMaskResult | None:
         leaf_mask,
         contour,
     )
+    return LeafMaskRecord(
+        mask=leaf_mask,
+        leaf_solidity=leaf_solidity,
+        mask_area_ratio=mask_area_ratio,
+        border_touch_ratio=touch_ratio,
+    )
+
+
+def evaluate_leaf_mask(image: np.ndarray) -> LeafMaskResult | None:
+    record = compute_leaf_mask_record(image)
+    if record is None:
+        return None
+
+    contour = _largest_contour(record.mask)
+    if contour is None:
+        return None
+
     overlay = _draw_contour_overlay(image, contour, CONTOUR_COLOR)
 
     return LeafMaskResult(
         overlay=overlay,
-        leaf_solidity=leaf_solidity,
-        mask_area_ratio=mask_area_ratio,
-        border_touch_ratio=touch_ratio,
+        leaf_solidity=record.leaf_solidity,
+        mask_area_ratio=record.mask_area_ratio,
+        border_touch_ratio=record.border_touch_ratio,
     )
 
 
@@ -253,6 +297,8 @@ def mask(
 
     saved_paths: list[Path] = []
 
+    from transformation.leaf_cache import get_leaf_mask
+
     for image_path in iter_image_paths(src, file, desc="mask"):
         image = cv2.imread(str(image_path))
 
@@ -260,15 +306,21 @@ def mask(
             print(f"Skipped unreadable image: {image_path}")
             continue
 
-        result = evaluate_leaf_mask(image)
-        if result is None:
+        record = get_leaf_mask(image_path)
+        if record is None:
             print(f"Skipped image without detected leaf: {image_path}")
             continue
 
+        contour = _largest_contour(record.mask)
+        if contour is None:
+            print(f"Skipped image without detected leaf: {image_path}")
+            continue
+
+        overlay = _draw_contour_overlay(image, contour, CONTOUR_COLOR)
         output_file = make_output_path(
             src, dst, image_path, file, "mask"
         )
-        cv2.imwrite(str(output_file), result.overlay)
+        cv2.imwrite(str(output_file), overlay)
         saved_paths.append(output_file)
 
     return saved_paths

@@ -12,6 +12,7 @@ import numpy as np  # type: ignore[import-not-found]
 from altair.vegalite.v5.api import Chart
 from plantcv.plantcv import print_image  # type: ignore[import-not-found]
 from transformation.analyze import apply_analyze
+from transformation.spot_mask import apply_spot_mask_image
 from transformation.gaussian_blur import apply_gaussian_blur
 from transformation.histogram import build_histogram_chart
 from transformation.mask import apply_mask
@@ -52,6 +53,7 @@ PANEL_TITLES: dict[str, str] = {
     "analyze": "Analyze",
     "pseudolandmarks": "Pseudolandmarks",
     "histogram": "Histogram",
+    "spot_mask": "Spot mask",
 }
 
 PANEL_COMPUTERS: dict[str, Callable[[np.ndarray], PreviewPanel | None]] = {
@@ -61,6 +63,7 @@ PANEL_COMPUTERS: dict[str, Callable[[np.ndarray], PreviewPanel | None]] = {
     "analyze": apply_analyze,
     "pseudolandmarks": apply_pseudolandmarks,
     "histogram": build_histogram_chart,
+    "spot_mask": apply_spot_mask_image,
 }
 
 

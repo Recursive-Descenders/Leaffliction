@@ -1,11 +1,11 @@
 from pathlib import Path
 import random
 
-import cv2  # type: ignore[import-not-found]
 import pandas as pd
 from tqdm import tqdm
 
-from transformation.mask import LeafMaskResult, evaluate_leaf_mask
+from transformation.leaf_cache import get_leaf_mask
+from transformation.mask import LeafMaskRecord
 from transformation.util import IMAGE_EXTENSIONS
 
 SOURCE_DIR = Path("leaves/images")
@@ -48,14 +48,14 @@ def _sample_image_paths(
 
 def _row_from_result(
     image_path: Path,
-    result: LeafMaskResult,
+    record: LeafMaskRecord,
 ) -> dict[str, object]:
     return {
         "image_path": str(image_path),
         "label": _label_from_path(image_path),
-        "leaf_solidity": result.leaf_solidity,
-        "mask_area_ratio": result.mask_area_ratio,
-        "border_touch_ratio": result.border_touch_ratio,
+        "leaf_solidity": record.leaf_solidity,
+        "mask_area_ratio": record.mask_area_ratio,
+        "border_touch_ratio": record.border_touch_ratio,
     }
 
 
@@ -68,17 +68,12 @@ def extract_features(image_paths: list[Path]) -> pd.DataFrame:
         unit="image",
         bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{rate_fmt}]",
     ):
-        image = cv2.imread(str(image_path))
-        if image is None:
-            print(f"Skipped unreadable image: {image_path}")
-            continue
-
-        result = evaluate_leaf_mask(image)
-        if result is None:
+        record = get_leaf_mask(image_path)
+        if record is None:
             print(f"Skipped image without detected leaf: {image_path}")
             continue
 
-        rows.append(_row_from_result(image_path, result))
+        rows.append(_row_from_result(image_path, record))
 
     if not rows:
         return pd.DataFrame()
