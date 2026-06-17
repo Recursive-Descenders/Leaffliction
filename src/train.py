@@ -1,5 +1,10 @@
+import typer
+
+from classification.train.pipeline import run
+
+
 def main() -> None:
-    print("train")
+    typer.run(run)
 
 
 if __name__ == "__main__":
