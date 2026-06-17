@@ -1,8 +1,11 @@
 """Persistent leaf mask cache."""
 
+from __future__ import annotations
+
 from pathlib import Path
 
 import cv2  # type: ignore[import-not-found]
+import numpy as np  # type: ignore[import-not-found]
 
 from transformation.cache_util import (
     cache_path_for,
@@ -90,6 +93,7 @@ def _migrate_legacy_cache(
 def get_leaf_mask(
     image_path: Path,
     *,
+    image: np.ndarray | None = None,
     force: bool = False,
 ) -> LeafMaskRecord | None:
     image_path = Path(image_path)
@@ -105,7 +109,8 @@ def get_leaf_mask(
         if migrated is not None:
             return migrated
 
-    image = cv2.imread(str(image_path))
+    if image is None:
+        image = cv2.imread(str(image_path))
     if image is None:
         return None
     record = compute_leaf_mask_record(image)

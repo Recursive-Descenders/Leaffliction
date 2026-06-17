@@ -151,6 +151,7 @@ def ensure_lesion_record(
     image_path: Path,
     thresholds: SpotThresholds = DEFAULT_SPOT_THRESHOLDS,
     *,
+    image: np.ndarray | None = None,
     force: bool = False,
 ) -> LesionRecord | None:
     """Load or compute the lesion cache without writing any PNG output."""
@@ -163,11 +164,12 @@ def ensure_lesion_record(
         if cached is not None:
             return cached
 
-    leaf_record = get_leaf_mask(image_path)
+    leaf_record = get_leaf_mask(image_path, image=image, force=force)
     if leaf_record is None:
         return None
 
-    image = cv2.imread(str(image_path))
+    if image is None:
+        image = cv2.imread(str(image_path))
     if image is None:
         return None
 

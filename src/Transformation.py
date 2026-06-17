@@ -9,6 +9,7 @@ from transformation.cli import DEFAULT_DST, run
 from transformation.lesion_analysis import lesion_analysis
 from transformation.gaussian_blur import gaussian_blur
 from transformation.mask import mask
+from transformation.mask_bundle import MASK_BUNDLE_TRANSFORMS, mask_bundle
 from transformation.pseudolandmarks import pseudolandmarks
 from transformation.preview import show_transformations
 from transformation.roi import roi
@@ -41,6 +42,16 @@ TRANSFORM_ORDER = (
     "pseudolandmarks",
     "histogram",
 )
+PARALLEL_TRANSFORMS = MASK_BUNDLE_TRANSFORMS
+
+
+def _output_dir(
+    name: str,
+    *,
+    dst: Path | None,
+    default_dst: Path,
+) -> Path:
+    return dst if dst is not None else default_dst
 
 
 def run_transformations(
@@ -49,6 +60,7 @@ def run_transformations(
     dst: Path | None = None,
     file: str | Path | None = None,
     transforms: frozenset[str] | None = None,
+    jobs: int = 0,
 ) -> None:
     selected = transforms or frozenset(TRANSFORMS)
 
@@ -61,12 +73,48 @@ def run_transformations(
         )
         return
 
+    bundle = selected & MASK_BUNDLE_TRANSFORMS
+    handled: set[str] = set()
+
+    if len(bundle) >= 2:
+        output_dirs = {
+            name: _output_dir(name, dst=dst, default_dst=TRANSFORMS[name][1])
+            for name in bundle
+        }
+        mask_bundle(
+            src=src,
+            output_dirs=output_dirs,
+            file=file,
+            selected=bundle,
+            jobs=jobs,
+        )
+        handled = set(bundle)
+    elif len(bundle) == 1:
+        name = next(iter(bundle))
+        transform_fn, default_dst = TRANSFORMS[name]
+        transform_fn(
+            src=src,
+            dst=_output_dir(name, dst=dst, default_dst=default_dst),
+            file=file,
+            jobs=jobs,
+        )
+        handled = {name}
+
     for name in TRANSFORM_ORDER:
-        if name not in selected:
+        if name not in selected or name in handled:
             continue
 
         transform_fn, default_dst = TRANSFORMS[name]
-        output_dir = dst if dst is not None else default_dst
+        output_dir = _output_dir(name, dst=dst, default_dst=default_dst)
+        if name in PARALLEL_TRANSFORMS:
+            transform_fn(
+                src=src,
+                dst=output_dir,
+                file=file,
+                jobs=jobs,
+            )
+            continue
+
         transform_fn(
             src=src,
             dst=output_dir,

@@ -161,6 +161,15 @@ def run(
             "Per-image color histogram from cached leaf and spot masks"
         ),
     ),
+    jobs: int = typer.Option(
+        0,
+        "-j",
+        "--jobs",
+        help=(
+            "Parallel workers for mask / lesion / histogram batch "
+            "(default: 0 = all CPU cores; use 1 for sequential)"
+        ),
+    ),
 ) -> None:
     try:
         args = _to_parsed_args(
@@ -185,4 +194,5 @@ def run(
         dst=args.dst,
         file=args.file,
         transforms=args.transforms,
+        jobs=jobs,
     )

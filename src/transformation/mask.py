@@ -4,8 +4,9 @@ from pathlib import Path
 import cv2  # type: ignore[import-not-found]
 import numpy as np  # type: ignore[import-not-found]
 
+from transformation.parallel import parallel_map
 from transformation.util import (
-    iter_image_paths,
+    get_image_paths,
     largest_leaf_mask,
     make_output_path,
     skip_image,
@@ -281,39 +282,67 @@ def apply_mask(
     return _overlay_from_record(image, record)
 
 
+@dataclass(frozen=True)
+class MaskWorkItem:
+    src: str
+    dst: str
+    file: str | None
+    image_path: str
+
+
+def process_mask_image(item: MaskWorkItem) -> str | None:
+    src = Path(item.src)
+    dst = Path(item.dst)
+    image_path = Path(item.image_path)
+    file = item.file
+
+    try:
+        image = validate_image_readable(image_path)
+    except ValueError as exc:
+        skip_image(image_path, str(exc))
+        return None
+
+    from transformation.leaf_cache import get_leaf_mask
+
+    record = get_leaf_mask(image_path, image=image)
+    if record is None:
+        skip_image(image_path, "no detected leaf")
+        return None
+
+    overlay = _overlay_from_record(image, record)
+    if overlay is None:
+        skip_image(image_path, "no detected leaf")
+        return None
+
+    output_file = make_output_path(src, dst, image_path, file, "mask")
+    cv2.imwrite(str(output_file), overlay)
+    return str(output_file)
+
+
 def mask(
     src: str | Path,
     dst: str | Path,
     file: str | Path | None = None,
+    *,
+    jobs: int = 0,
 ) -> list[Path]:
     src = Path(src)
     dst = Path(dst)
+    file_name = str(file) if file is not None else None
 
-    saved_paths: list[Path] = []
-
-    from transformation.leaf_cache import get_leaf_mask
-
-    for image_path in iter_image_paths(src, file, desc="mask"):
-        try:
-            image = validate_image_readable(image_path)
-        except ValueError as exc:
-            skip_image(image_path, str(exc))
-            continue
-
-        record = get_leaf_mask(image_path)
-        if record is None:
-            skip_image(image_path, "no detected leaf")
-            continue
-
-        overlay = _overlay_from_record(image, record)
-        if overlay is None:
-            skip_image(image_path, "no detected leaf")
-            continue
-
-        output_file = make_output_path(
-            src, dst, image_path, file, "mask"
+    items = [
+        MaskWorkItem(
+            src=str(src),
+            dst=str(dst),
+            file=file_name,
+            image_path=str(image_path),
         )
-        cv2.imwrite(str(output_file), overlay)
-        saved_paths.append(output_file)
-
-    return saved_paths
+        for image_path in get_image_paths(src, file)
+    ]
+    results = parallel_map(
+        process_mask_image,
+        items,
+        jobs=jobs,
+        desc="mask",
+    )
+    return [Path(path) for path in results if path is not None]
