@@ -18,6 +18,7 @@ dependencies = [
 dist = "Distribution:main"
 aug = "Augmentation:main"
 xfm = "Transformation:main"
+extract = "Extract:main"
 tr = "train:main"
 pr = "predict:main"
 
@@ -34,13 +35,14 @@ py-modules = [
     "Distribution",
     "Augmentation",
     "Transformation",
+    "Extract",
     "train",
     "predict",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["distribution*"]
+include = ["distribution*", "classification*"]
 
 [tool.uv]
 link-mode = "copy"

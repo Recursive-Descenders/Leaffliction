@@ -8,6 +8,8 @@ from transformation.util import (
     iter_image_paths,
     largest_leaf_mask,
     make_output_path,
+    skip_image,
+    validate_image_readable,
 )
 
 _OPEN_KERNEL = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
@@ -24,14 +26,6 @@ SHADOW_S_MAX = 45
 @dataclass(frozen=True)
 class LeafMaskRecord:
     mask: np.ndarray
-    leaf_solidity: float
-    mask_area_ratio: float
-    border_touch_ratio: float
-
-
-@dataclass(frozen=True)
-class LeafMaskResult:
-    overlay: np.ndarray
     leaf_solidity: float
     mask_area_ratio: float
     border_touch_ratio: float
@@ -261,30 +255,30 @@ def compute_leaf_mask_record(image: np.ndarray) -> LeafMaskRecord | None:
     )
 
 
-def evaluate_leaf_mask(image: np.ndarray) -> LeafMaskResult | None:
-    record = compute_leaf_mask_record(image)
-    if record is None:
-        return None
-
+def _overlay_from_record(
+    image: np.ndarray,
+    record: LeafMaskRecord,
+) -> np.ndarray | None:
     contour = _largest_contour(record.mask)
     if contour is None:
         return None
-
-    overlay = _draw_contour_overlay(image, contour, CONTOUR_COLOR)
-
-    return LeafMaskResult(
-        overlay=overlay,
-        leaf_solidity=record.leaf_solidity,
-        mask_area_ratio=record.mask_area_ratio,
-        border_touch_ratio=record.border_touch_ratio,
-    )
+    return _draw_contour_overlay(image, contour, CONTOUR_COLOR)
 
 
-def apply_mask(image: np.ndarray) -> np.ndarray | None:
-    result = evaluate_leaf_mask(image)
-    if result is None:
+def apply_mask(
+    image: np.ndarray,
+    image_path: Path | None = None,
+) -> np.ndarray | None:
+    if image_path is not None:
+        from transformation.leaf_cache import get_leaf_mask
+
+        record = get_leaf_mask(image_path)
+    else:
+        record = compute_leaf_mask_record(image)
+
+    if record is None:
         return None
-    return result.overlay
+    return _overlay_from_record(image, record)
 
 
 def mask(
@@ -300,23 +294,22 @@ def mask(
     from transformation.leaf_cache import get_leaf_mask
 
     for image_path in iter_image_paths(src, file, desc="mask"):
-        image = cv2.imread(str(image_path))
-
-        if image is None:
-            print(f"Skipped unreadable image: {image_path}")
+        try:
+            image = validate_image_readable(image_path)
+        except ValueError as exc:
+            skip_image(image_path, str(exc))
             continue
 
         record = get_leaf_mask(image_path)
         if record is None:
-            print(f"Skipped image without detected leaf: {image_path}")
+            skip_image(image_path, "no detected leaf")
             continue
 
-        contour = _largest_contour(record.mask)
-        if contour is None:
-            print(f"Skipped image without detected leaf: {image_path}")
+        overlay = _overlay_from_record(image, record)
+        if overlay is None:
+            skip_image(image_path, "no detected leaf")
             continue
 
-        overlay = _draw_contour_overlay(image, contour, CONTOUR_COLOR)
         output_file = make_output_path(
             src, dst, image_path, file, "mask"
         )

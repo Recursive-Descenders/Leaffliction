@@ -4,10 +4,10 @@ from pathlib import Path
 import typer
 
 from transformation.analyze import analyze
+from transformation.color_histogram import histogram
 from transformation.cli import DEFAULT_DST, run
-from transformation.spot_mask import spot_mask
+from transformation.lesion_analysis import lesion_analysis
 from transformation.gaussian_blur import gaussian_blur
-from transformation.histogram import histogram
 from transformation.mask import mask
 from transformation.pseudolandmarks import pseudolandmarks
 from transformation.preview import show_transformations
@@ -19,23 +19,23 @@ ROI_OUTPUT_DIR = DEFAULT_DST / "roi"
 ANALYZE_OUTPUT_DIR = DEFAULT_DST / "analyze"
 PSEUDOLANDMARKS_OUTPUT_DIR = DEFAULT_DST / "pseudolandmarks"
 HISTOGRAM_OUTPUT_DIR = DEFAULT_DST / "histogram"
-SPOT_MASK_OUTPUT_DIR = DEFAULT_DST / "spot_mask"
+LESION_ANALYSIS_OUTPUT_DIR = DEFAULT_DST / "lesion_analysis"
 
 TransformFn = Callable[..., list[Path]]
 
 TRANSFORMS: dict[str, tuple[TransformFn, Path]] = {
     "blur": (gaussian_blur, BLUR_OUTPUT_DIR),
     "mask": (mask, MASK_OUTPUT_DIR),
-    "spot_mask": (spot_mask, SPOT_MASK_OUTPUT_DIR),
     "roi": (roi, ROI_OUTPUT_DIR),
     "analyze": (analyze, ANALYZE_OUTPUT_DIR),
     "pseudolandmarks": (pseudolandmarks, PSEUDOLANDMARKS_OUTPUT_DIR),
     "histogram": (histogram, HISTOGRAM_OUTPUT_DIR),
+    "lesion_analysis": (lesion_analysis, LESION_ANALYSIS_OUTPUT_DIR),
 }
 TRANSFORM_ORDER = (
     "blur",
     "mask",
-    "spot_mask",
+    "lesion_analysis",
     "roi",
     "analyze",
     "pseudolandmarks",

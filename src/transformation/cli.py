@@ -1,7 +1,14 @@
+"""xfm CLI: parse flags and run image transformations."""
+
 from dataclasses import dataclass
 from pathlib import Path
 
 import typer
+
+from transformation.util import (
+    validate_dst_is_directory,
+    validate_source_exists,
+)
 
 DEFAULT_SOURCE = Path("leaves/images")
 DEFAULT_DST = Path("outputs/transformation")
@@ -9,11 +16,11 @@ DEFAULT_DST = Path("outputs/transformation")
 TRANSFORM_FLAGS = (
     "blur",
     "mask",
+    "lesion_analysis",
     "roi",
     "analyze",
     "pseudolandmarks",
     "histogram",
-    "spot_mask",
 )
 
 
@@ -26,19 +33,14 @@ class ParsedArgs:
 
 
 def _resolve_source(path: Path) -> tuple[Path, str | None]:
+    validate_source_exists(path)
     if path.is_file():
         return path.parent, path.name
-
-    if path.is_dir():
-        return path, None
-
-    raise FileNotFoundError(f"Source path does not exist: {path}")
+    return path, None
 
 
 def _resolve_destination(path: Path) -> Path:
-    if path.is_file():
-        return path.parent
-
+    validate_dst_is_directory(path)
     return path
 
 
@@ -49,11 +51,11 @@ def _to_parsed_args(
     all_transforms: bool,
     blur: bool,
     mask: bool,
+    lesion_shape: bool,
     roi: bool,
     analyze: bool,
     pseudolandmarks: bool,
     histogram: bool,
-    spot_mask: bool,
 ) -> ParsedArgs:
     resolved_src, file = _resolve_source(src)
     resolved_dst = _resolve_destination(dst) if dst is not None else None
@@ -63,11 +65,11 @@ def _to_parsed_args(
         for name, enabled in (
             ("blur", blur),
             ("mask", mask),
+            ("lesion_analysis", lesion_shape),
             ("roi", roi),
             ("analyze", analyze),
             ("pseudolandmarks", pseudolandmarks),
             ("histogram", histogram),
-            ("spot_mask", spot_mask),
         )
         if enabled
     }
@@ -88,16 +90,23 @@ def run(
         DEFAULT_SOURCE,
         "-s",
         "--src",
-        help="Source image file or directory "
-        f"(default: {DEFAULT_SOURCE})",
+        help=(
+            "Source image file or directory "
+            f"(default: {DEFAULT_SOURCE}). "
+            "Examples: "
+            "'uv run xfm -s leaf.jpg' (preview), "
+            "'uv run xfm -s leaves/images -d out/ -m -g' (batch)"
+        ),
     ),
     dst: Path | None = typer.Option(
         None,
         "-d",
         "--dst",
-        help="Destination directory for outputs "
-        f"(default: {DEFAULT_DST}/<transform>; "
-        "omit with a single source image to show previews)",
+        help=(
+            "Destination directory for batch outputs "
+            f"(default: {DEFAULT_DST}/<transform>). "
+            "Omit with a single source image to show previews."
+        ),
     ),
     all_transforms: bool = typer.Option(
         False,
@@ -109,57 +118,65 @@ def run(
         False,
         "-b",
         "--blur",
-        help="Run the blur transformation",
+        help="Gaussian blur",
     ),
     mask: bool = typer.Option(
         False,
         "-m",
         "--mask",
-        help="Run the mask transformation",
+        help="Leaf mask contour overlay (cached)",
+    ),
+    lesion_shape: bool = typer.Option(
+        False,
+        "-ls",
+        "--lesion-shape",
+        help=(
+            "Lesion analysis: spot-mask contours + summary "
+            "(uses cached leaf and spot masks)"
+        ),
     ),
     roi: bool = typer.Option(
         False,
         "-r",
         "--roi",
-        help="Run the roi transformation",
+        help="ROI visualization",
     ),
     analyze: bool = typer.Option(
         False,
         "-anlz",
         "--analyze",
-        help="Run the analyze transformation",
+        help="PlantCV size analysis overlay",
     ),
     pseudolandmarks: bool = typer.Option(
         False,
         "-pl",
         "--pseudolandmarks",
-        help="Run the pseudolandmarks transformation",
+        help="Pseudolandmarks overlay",
     ),
     histogram: bool = typer.Option(
         False,
         "-g",
         "--histogram",
-        help="Run the histogram transformation",
-    ),
-    spot_mask: bool = typer.Option(
-        False,
-        "-sm",
-        "--spot-mask",
-        help="Run the spot mask transformation",
+        help=(
+            "Per-image color histogram from cached leaf and spot masks"
+        ),
     ),
 ) -> None:
-    args = _to_parsed_args(
-        src=src,
-        dst=dst,
-        all_transforms=all_transforms,
-        blur=blur,
-        mask=mask,
-        roi=roi,
-        analyze=analyze,
-        pseudolandmarks=pseudolandmarks,
-        histogram=histogram,
-        spot_mask=spot_mask,
-    )
+    try:
+        args = _to_parsed_args(
+            src=src,
+            dst=dst,
+            all_transforms=all_transforms,
+            blur=blur,
+            mask=mask,
+            lesion_shape=lesion_shape,
+            roi=roi,
+            analyze=analyze,
+            pseudolandmarks=pseudolandmarks,
+            histogram=histogram,
+        )
+    except (FileNotFoundError, NotADirectoryError, ValueError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
     from Transformation import run_transformations
 

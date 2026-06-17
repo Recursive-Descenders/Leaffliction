@@ -9,16 +9,16 @@ from pathlib import Path
 import cv2  # type: ignore[import-not-found]
 import matplotlib
 import numpy as np  # type: ignore[import-not-found]
-from altair.vegalite.v5.api import Chart
-from plantcv.plantcv import print_image  # type: ignore[import-not-found]
 from transformation.analyze import apply_analyze
-from transformation.spot_mask import apply_spot_mask_image
+from transformation.color_histogram import build_color_histogram_figure
+from transformation.lesion_analysis import build_lesion_analysis_figure
+from transformation.lesion_cache import ensure_lesion_record
+from transformation.leaf_cache import get_leaf_mask
 from transformation.gaussian_blur import apply_gaussian_blur
-from transformation.histogram import build_histogram_chart
 from transformation.mask import apply_mask
 from transformation.pseudolandmarks import apply_pseudolandmarks
 from transformation.roi import apply_roi
-from transformation.util import get_image_paths
+from transformation.util import get_image_paths, validate_image_readable
 
 _INTERACTIVE_BACKENDS = (
     "TkAgg",
@@ -44,7 +44,7 @@ def _configure_matplotlib() -> None:
 _configure_matplotlib()
 import matplotlib.pyplot as plt  # noqa: E402
 
-PreviewPanel = np.ndarray | Chart
+PreviewPanel = np.ndarray
 
 PANEL_TITLES: dict[str, str] = {
     "blur": "Gaussian blur",
@@ -52,18 +52,12 @@ PANEL_TITLES: dict[str, str] = {
     "roi": "ROI",
     "analyze": "Analyze",
     "pseudolandmarks": "Pseudolandmarks",
-    "histogram": "Histogram",
-    "spot_mask": "Spot mask",
+    "histogram": "Color histogram",
+    "lesion_analysis": "Lesion analysis",
 }
 
 PANEL_COMPUTERS: dict[str, Callable[[np.ndarray], PreviewPanel | None]] = {
     "blur": apply_gaussian_blur,
-    "mask": apply_mask,
-    "roi": apply_roi,
-    "analyze": apply_analyze,
-    "pseudolandmarks": apply_pseudolandmarks,
-    "histogram": build_histogram_chart,
-    "spot_mask": apply_spot_mask_image,
 }
 
 
@@ -73,19 +67,80 @@ class PreviewResult:
     panel: PreviewPanel
 
 
-def _chart_to_rgb(chart: Chart) -> np.ndarray:
-    with tempfile.NamedTemporaryFile(suffix=".png") as tmp:
-        print_image(chart, tmp.name)
-        image = cv2.imread(tmp.name)
+PATH_AWARE_PANELS = frozenset({
+    "mask",
+    "roi",
+    "analyze",
+    "pseudolandmarks",
+    "histogram",
+    "lesion_analysis",
+})
 
-    if image is None:
-        raise RuntimeError("Failed to render histogram chart")
 
-    return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+def _figure_to_bgr(figure: plt.Figure) -> np.ndarray:
+    figure.canvas.draw()
+    width, height = figure.canvas.get_width_height()
+    buffer = np.frombuffer(
+        figure.canvas.buffer_rgba(),
+        dtype=np.uint8,
+    ).reshape(height, width, 4)
+    return cv2.cvtColor(buffer[:, :, :3], cv2.COLOR_RGB2BGR)
+
+
+def _figure_panel(figure: plt.Figure) -> np.ndarray:
+    panel = _figure_to_bgr(figure)
+    plt.close(figure)
+    return panel
+
+
+def _compute_panel(
+    name: str,
+    image: np.ndarray,
+    image_path: Path,
+) -> PreviewPanel | None:
+    if name == "mask":
+        return apply_mask(image, image_path=image_path)
+    if name == "roi":
+        return apply_roi(image, image_path=image_path)
+    if name == "analyze":
+        return apply_analyze(image, image_path=image_path)
+    if name == "pseudolandmarks":
+        return apply_pseudolandmarks(image, image_path=image_path)
+    if name == "histogram":
+        record = get_leaf_mask(image_path)
+        if record is None:
+            return None
+        lesion_record = ensure_lesion_record(image_path)
+        if lesion_record is None:
+            return None
+        return _figure_panel(
+            build_color_histogram_figure(
+                image,
+                record.mask,
+                lesion_record.spot_mask,
+            )
+        )
+    if name == "lesion_analysis":
+        record = get_leaf_mask(image_path)
+        if record is None:
+            return None
+        lesion_record = ensure_lesion_record(image_path)
+        if lesion_record is None:
+            return None
+        return _figure_panel(
+            build_lesion_analysis_figure(
+                image,
+                record.mask,
+                lesion_record,
+            )
+        )
+
+    return PANEL_COMPUTERS[name](image)
 
 
 def _collect_panels(
     image: np.ndarray,
+    image_path: Path,
     transforms: frozenset[str],
     order: tuple[str, ...],
 ) -> list[PreviewResult]:
@@ -97,8 +152,10 @@ def _collect_panels(
         if name not in transforms:
             continue
 
-        computer = PANEL_COMPUTERS[name]
-        panel = computer(image)
+        if name in PATH_AWARE_PANELS:
+            panel = _compute_panel(name, image, image_path)
+        else:
+            panel = PANEL_COMPUTERS[name](image)
         if panel is None:
             print(f"Skipped {name}: no result for preview")
             continue
@@ -106,16 +163,6 @@ def _collect_panels(
         panels.append(PreviewResult(title=PANEL_TITLES[name], panel=panel))
 
     return panels
-
-
-def _figure_to_bgr(figure: plt.Figure) -> np.ndarray:
-    figure.canvas.draw()
-    width, height = figure.canvas.get_width_height()
-    buffer = np.frombuffer(
-        figure.canvas.buffer_rgba(),
-        dtype=np.uint8,
-    ).reshape(height, width, 4)
-    return cv2.cvtColor(buffer[:, :, :3], cv2.COLOR_RGB2BGR)
 
 
 def _screen_size() -> tuple[int, int]:
@@ -244,12 +291,9 @@ def show_transformations(
     order: tuple[str, ...],
 ) -> None:
     image_path = get_image_paths(src, file)[0]
-    image = cv2.imread(str(image_path))
+    image = validate_image_readable(image_path)
 
-    if image is None:
-        raise ValueError(f"Could not read image: {image_path}")
-
-    panels = _collect_panels(image, transforms, order)
+    panels = _collect_panels(image, image_path, transforms, order)
     if not panels:
         print("No transformations to display.")
         return
@@ -273,10 +317,6 @@ def show_transformations(
     for axis, result in zip(flat_axes, panels, strict=False):
         axis.set_title(result.title)
         axis.axis("off")
-
-        if isinstance(result.panel, Chart):
-            axis.imshow(_chart_to_rgb(result.panel))
-            continue
 
         axis.imshow(cv2.cvtColor(result.panel, cv2.COLOR_BGR2RGB))
 
