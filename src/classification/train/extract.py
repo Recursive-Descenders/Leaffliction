@@ -1,5 +1,4 @@
 from pathlib import Path
-import random
 
 import pandas as pd
 import typer
@@ -14,8 +13,6 @@ from transformation.util import IMAGE_EXTENSIONS, validate_source_exists
 
 SOURCE_DIR = Path("leaves/images")
 OUTPUT_CSV = Path("outputs/classification/train/features_rf.csv")
-IMAGES_PER_DIR = 200
-RANDOM_SEED = 42
 
 
 def _label_from_path(image_path: Path) -> str:
@@ -24,29 +21,20 @@ def _label_from_path(image_path: Path) -> str:
     return image_path.stem
 
 
-def _sample_image_paths(
-    src: Path,
-    *,
-    per_dir: int,
-    seed: int,
-) -> list[Path]:
-    rng = random.Random(seed)
+def _all_image_paths(src: Path) -> list[Path]:
     selected: list[Path] = []
 
     for class_dir in sorted(src.iterdir()):
         if not class_dir.is_dir():
             continue
 
-        images = [
+        images = sorted(
             path
             for path in class_dir.iterdir()
             if path.is_file()
             and path.suffix.lower() in IMAGE_EXTENSIONS
-        ]
-        if not images:
-            continue
-
-        selected.extend(rng.sample(images, min(per_dir, len(images))))
+        )
+        selected.extend(images)
 
     return selected
 
@@ -89,14 +77,8 @@ def extract_features(image_paths: list[Path]) -> pd.DataFrame:
 def extract(
     *,
     src: Path = SOURCE_DIR,
-    per_dir: int = IMAGES_PER_DIR,
-    seed: int = RANDOM_SEED,
 ) -> pd.DataFrame:
-    image_paths = _sample_image_paths(
-        src,
-        per_dir=per_dir,
-        seed=seed,
-    )
+    image_paths = _all_image_paths(src)
     return extract_features(image_paths)
 
 
@@ -126,16 +108,6 @@ def run(
         "--output",
         help=f"Output CSV path (default: {OUTPUT_CSV})",
     ),
-    per_dir: int = typer.Option(
-        IMAGES_PER_DIR,
-        "--per-dir",
-        help="Maximum images sampled per class directory",
-    ),
-    seed: int = typer.Option(
-        RANDOM_SEED,
-        "--seed",
-        help="Random seed for per-class image sampling",
-    ),
 ) -> None:
     try:
         validate_source_exists(src)
@@ -146,7 +118,7 @@ def run(
     except (FileNotFoundError, NotADirectoryError, ValueError) as exc:
         raise typer.BadParameter(str(exc)) from exc
 
-    df = extract(src=src, per_dir=per_dir, seed=seed)
+    df = extract(src=src)
     csv_path = save_features_csv(df, output)
     print(f"Extracted: {len(df)} leaves")
     print(f"Saved CSV: {csv_path}")
