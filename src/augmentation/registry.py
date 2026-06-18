@@ -53,3 +53,24 @@ POOL: list[Method] = [
     Method("Distortion", apply_radial_distortion, {"k": (-0.2, 0.2)}),
 ]
 """Geometric-only MVP pool. Append color_jitter once S3 ships (decision #8)."""
+
+_POOL_INDEX: dict[str, Method] = {m.name.lower(): m for m in POOL}
+
+
+def lookup_methods(names: list[str]) -> list[Method]:
+    """Resolve method names (case-insensitive) to Method objects.
+
+    Raises ValueError listing all invalid names and the valid options.
+    """
+    result: list[Method] = []
+    invalid: list[str] = []
+    for name in names:
+        method = _POOL_INDEX.get(name.lower())
+        if method is None:
+            invalid.append(name)
+        else:
+            result.append(method)
+    if invalid:
+        valid = ", ".join(m.name for m in POOL)
+        raise ValueError(f"Unknown method(s): {invalid}. Valid: {valid}")
+    return result
