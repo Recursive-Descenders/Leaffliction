@@ -194,7 +194,10 @@ def augment(
         0,
         "--target",
         "-t",
-        help="Folder mode: target augmented image count per class (0 = auto-detect).",
+        help=(
+            "Folder mode: target augmented image count per class "
+            "(0 = auto-detect)."
+        ),
     ),
     balance: bool = typer.Option(
         False,
@@ -213,7 +216,8 @@ def augment(
         "--methods",
         "-m",
         help=(
-            "Comma-separated methods applied in order (e.g. --methods Flip,Rotate). "
+            "Comma-separated methods applied in order "
+            "(e.g. --methods Flip,Rotate). "
             "Replaces random K=2 pool selection. "
             "Valid: Flip, Rotate, Shear, Skew, Crop, Distortion."
         ),
@@ -222,8 +226,8 @@ def augment(
         False,
         "--copy-raw",
         help=(
-            "Copy source images into <dst>/<class>/ alongside augmented outputs. "
-            "Raw copies are not counted toward --target."
+            "Copy source images into <dst>/<class>/ alongside augmented "
+            "outputs. Raw copies are not counted toward --target."
         ),
     ),
 ) -> None:
@@ -231,7 +235,8 @@ def augment(
     seed_value = seed if seed >= 0 else None
 
     try:
-        fixed = lookup_methods([m.strip() for m in methods.split(",")]) if methods else None
+        names = [m.strip() for m in methods.split(",")]
+        fixed = lookup_methods(names) if methods else None
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
 
