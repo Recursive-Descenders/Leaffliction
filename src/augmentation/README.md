@@ -35,13 +35,14 @@ Ranges are the "high freedom" band per decision #2 (B2 shape is not the
 classification signal). Color jitter (`hue`, `saturation`) is the planned
 S3 addition once color preprocessing lands — see decision #8.
 
-## Composition: K=2
+## Composition
 
 Every CLI call hands work to an `Augmentor`. Each `Augmentor.apply(image)`:
 
-1. Draws **two distinct** methods from `POOL` without replacement.
+1. Selects methods — either K=2 drawn at random from `POOL` (default), or
+   the fixed sequence supplied via `--methods`.
 2. Samples a magnitude for each parameter uniformly from its range.
-3. Applies the two methods in call order.
+3. Applies the methods in call order.
 4. Records the method names on `last_methods` so the IO layer can encode
    them into the output filename.
 
@@ -52,14 +53,14 @@ every composition, so methods that still use `np.random.*` internally
 ## CLI: one entry, three modes
 
 ```bash
-# Mode A — single image: write N K=2 variants under --dst.
-uv run aug "data/raw/Apple/apple_healthy/image (1).JPG" --n 6
+# Mode A — single image: write N augmented variants under --dst.
+uv run aug "data/raw/Apple_healthy/image (1).JPG" --n 6
 
-# Mode B — class folder: fill the folder to --target images.
-uv run aug data/train/Apple/apple_rust --target 1640
+# Mode B — class folder: fill the folder to --target augmented images.
+uv run aug data/raw/Apple_rust --target 1640
 
 # Mode C — dataset root: balance every class to the largest count.
-uv run aug data/train/Apple --balance
+uv run aug data/raw --balance
 ```
 
 Mode is dispatched on the input path:
@@ -79,21 +80,50 @@ the kept images so every source contributes evenly to the new totals.
 | Flag | Default | Mode | Meaning |
 | --- | --- | --- | --- |
 | `--dst` / `-d` | `data/augmented_directory` | all | Output root. Folder modes write under `<dst>/<class_name>/`; source folders are never mutated. |
-| `--n` / `-n` | 6 | A | Number of K=2 variants to produce. |
-| `--target` / `-t` | 0 | B, C | Target image count per class. 0 = auto-detect (C only). |
+| `--n` / `-n` | 6 | A | Number of augmented variants to produce. |
+| `--target` / `-t` | 0 | B, C | Target **augmented** image count per class. 0 = auto-detect (C only). |
 | `--balance` / `-b` | off | C | Auto-target the largest class count. |
 | `--seed` / `-s` | 42 | all | RNG seed. Negative = stochastic. |
+| `--methods` / `-m` | — | all | Comma-separated methods applied in order, e.g. `Flip,Rotate`. Replaces random K=2 selection; parameter magnitudes are still sampled randomly. Supports K=1. |
+| `--copy-raw` | off | all | Copy source images into `<dst>/<class>/` alongside augmented outputs. Raw copies are **not** counted toward `--target`. |
+
+Valid method names (case-insensitive): `Flip`, `Rotate`, `Shear`, `Skew`,
+`Crop`, `Distortion`. An unknown name causes an immediate error that lists
+all valid options.
+
+### Examples
+
+```bash
+# Pin methods: every output is Flip → Rotate (params still random)
+uv run aug "data/raw/Apple_healthy/image (1).JPG" \
+    --methods Flip,Rotate --n 4
+
+# Class folder: produce 200 augmented images using only Crop
+uv run aug data/raw/Apple_rust \
+    --methods Crop --target 200 --dst out/
+
+# Dataset root: balance + copy raw images into the output directory
+uv run aug data/raw \
+    --balance --copy-raw --dst out/
+# Result per class: <original count> raw copies + <augmented count> to reach target
+
+# Single method (K=1)
+uv run aug "data/raw/Apple_healthy/image (1).JPG" \
+    --methods Flip --n 3 --copy-raw --dst /tmp/preview/
+# Output: image (1).JPG  image (1)_Flip_0.JPG  image (1)_Flip_1.JPG  image (1)_Flip_2.JPG
+```
 
 ### Output naming
 
 `build_aug_output_path` emits
 
 ```
-<stem>_<Method1>_<Method2>_<i><suffix>
+<stem>_<Method1>[_<Method2>...]_<i><suffix>
 ```
 
 e.g. `image (1)_Flip_Crop_0.JPG`. The methods are listed in the order
 they were applied; `i` is the per-source counter inside a single run.
+With `--methods Flip` (K=1) the name becomes `image (1)_Flip_0.JPG`.
 
 `build_output_path` (the older single-method form,
 `<stem>_<Method><suffix>`) is still exported for callers that want it
