@@ -5,8 +5,7 @@ PR.md
 
 # Generated outputs
 outputs/
-/transformed/
-temp_copy_transformed.py
+data/
 
 # Python / uv
 .venv/

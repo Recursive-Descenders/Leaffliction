@@ -28,7 +28,7 @@ from transformation.spot_mask import (
     thresholds_signature,
 )
 
-CACHE_ROOT = Path("outputs/cache/lesion")
+CACHE_ROOT = Path("data/cache/lesion")
 
 
 @dataclass(frozen=True)

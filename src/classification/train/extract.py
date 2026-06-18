@@ -11,8 +11,8 @@ from transformation.lesion_cache import (
 )
 from transformation.util import IMAGE_EXTENSIONS, validate_source_exists
 
-SOURCE_DIR = Path("leaves/images")
-OUTPUT_CSV = Path("outputs/classification/train/features_rf.csv")
+SOURCE_DIR = Path("data/augmented_directory")
+OUTPUT_CSV = Path("data/classification_directory/features_rf.csv")
 
 
 def _label_from_path(image_path: Path) -> str:
@@ -99,7 +99,7 @@ def run(
         help=(
             "Image directory with class subfolders "
             f"(default: {SOURCE_DIR}). "
-            "Example: 'uv run extract -s leaves/images -o features.csv'"
+            "Example: 'uv run extract -s data/augmented_directory -o features.csv'"
         ),
     ),
     output: Path = typer.Option(
@@ -123,8 +123,8 @@ def run(
     print(f"Extracted: {len(df)} leaves")
     print(f"Saved CSV: {csv_path}")
     print(
-        "Masks reused from outputs/cache/leaf_mask/ "
-        "and outputs/cache/lesion/"
+        "Masks reused from data/cache/leaf_mask/ "
+        "and data/cache/lesion/"
     )
 
 

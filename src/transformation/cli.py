@@ -10,8 +10,8 @@ from transformation.util import (
     validate_source_exists,
 )
 
-DEFAULT_SOURCE = Path("leaves/images")
-DEFAULT_DST = Path("outputs/transformation")
+DEFAULT_SOURCE = Path("data/augmented_directory")
+DEFAULT_DST = Path("data/transformed_directory")
 
 TRANSFORM_FLAGS = (
     "blur",
@@ -95,7 +95,7 @@ def run(
             f"(default: {DEFAULT_SOURCE}). "
             "Examples: "
             "'uv run xfm -s leaf.jpg' (preview), "
-            "'uv run xfm -s leaves/images -d out/ -m -g' (batch)"
+            "'uv run xfm -s data/augmented_directory -d out/ -m -g' (batch)"
         ),
     ),
     dst: Path | None = typer.Option(

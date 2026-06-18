@@ -17,7 +17,7 @@ from transformation.cache_util import (
 )
 from transformation.mask import LeafMaskRecord, compute_leaf_mask_record
 
-CACHE_ROOT = Path("outputs/cache/leaf_mask")
+CACHE_ROOT = Path("data/cache/leaf_mask")
 LEGACY_CACHE_ROOT = Path("outputs/cache/leaf_masks")
 
 

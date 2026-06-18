@@ -22,8 +22,8 @@ from transformation.util import (
     validate_source_exists,
 )
 
-SOURCE_DIR = Path("leaves/images")
-DEFAULT_DST = Path("outputs/classification/train")
+SOURCE_DIR = Path("data/augmented_directory")
+DEFAULT_DST = Path("data/classification_directory")
 FEATURES_FILENAME = "features_rf.csv"
 
 
@@ -85,7 +85,7 @@ def run(
             "Image directory with class subfolders "
             f"(default: {SOURCE_DIR}). "
             "Used only when features CSV is missing. "
-            "Example: 'uv run tr -s leaves/images -d out/train'"
+            "Example: 'uv run tr -s data/augmented_directory -d out/train'"
         ),
     ),
     dst: Path = typer.Option(
