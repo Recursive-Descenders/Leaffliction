@@ -1,6 +1,6 @@
 import typer
 
-from classification.train.pipeline import run
+from classification.train.extract import run
 
 
 def main() -> None:

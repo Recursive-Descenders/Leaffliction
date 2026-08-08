@@ -2,14 +2,35 @@ from pathlib import Path
 import cv2  # type: ignore[import-not-found]
 import numpy as np  # type: ignore[import-not-found]
 from plantcv import plantcv as pcv  # type: ignore[import-not-found]
+from transformation.leaf_cache import get_leaf_mask
 from transformation.mask import build_mask
-from transformation.util import iter_image_paths, make_output_path
+from transformation.util import (
+    iter_image_paths,
+    largest_leaf_mask,
+    make_output_path,
+    skip_image,
+    validate_image_readable,
+)
 
 
-def apply_roi(image: np.ndarray) -> np.ndarray | None:
-    mask_image = build_mask(image)
+def apply_roi(
+    image: np.ndarray,
+    leaf_mask: np.ndarray | None = None,
+    *,
+    image_path: Path | None = None,
+) -> np.ndarray | None:
+    if leaf_mask is None and image_path is not None:
+        record = get_leaf_mask(image_path)
+        if record is None:
+            return None
+        leaf_mask = record.mask
+    if leaf_mask is None:
+        leaf_mask = largest_leaf_mask(build_mask(image))
+    if leaf_mask is None:
+        return None
+
     contours, _ = cv2.findContours(
-        mask_image,
+        leaf_mask,
         cv2.RETR_EXTERNAL,
         cv2.CHAIN_APPROX_SIMPLE,
     )
@@ -28,7 +49,7 @@ def apply_roi(image: np.ndarray) -> np.ndarray | None:
     )
 
     selected_mask = pcv.roi.filter(
-        mask=mask_image,
+        mask=leaf_mask,
         roi=leaf_roi,
         roi_type="partial",
     )
@@ -67,15 +88,20 @@ def roi(
     saved_paths: list[Path] = []
 
     for image_path in iter_image_paths(src, file, desc="roi"):
-        image = cv2.imread(str(image_path))
-
-        if image is None:
-            print(f"Skipped unreadable image: {image_path}")
+        try:
+            image = validate_image_readable(image_path)
+        except ValueError as exc:
+            skip_image(image_path, str(exc))
             continue
 
-        roi_image = apply_roi(image)
+        record = get_leaf_mask(image_path)
+        if record is None:
+            skip_image(image_path, "no detected leaf")
+            continue
+
+        roi_image = apply_roi(image, record.mask)
         if roi_image is None:
-            print(f"Skipped image without detected leaf: {image_path}")
+            skip_image(image_path, "no detected leaf")
             continue
 
         output_file = make_output_path(

@@ -5,6 +5,7 @@ PR.md
 
 # Generated outputs
 outputs/
+data/
 
 # Python / uv
 .venv/
