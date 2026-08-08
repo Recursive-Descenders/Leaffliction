@@ -1,7 +1,9 @@
+from collections.abc import Iterator
 from pathlib import Path
 
 import cv2  # type: ignore[import-not-found]
 import numpy as np  # type: ignore[import-not-found]
+from tqdm import tqdm
 
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
@@ -61,6 +63,20 @@ def get_image_paths(
         )
 
     return [image_path]
+
+
+def iter_image_paths(
+    src: Path,
+    file: str | Path | None,
+    desc: str | None = None,
+) -> Iterator[Path]:
+    image_paths = get_image_paths(src, file)
+    yield from tqdm(
+        image_paths,
+        desc=desc,
+        unit="image",
+        bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{rate_fmt}]",
+    )
 
 
 def make_output_path(
