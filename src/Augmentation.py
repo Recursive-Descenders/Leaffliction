@@ -6,7 +6,7 @@ Augmentation CLI — unified entry, dispatches on input path type.
     uv run aug "data/raw/Apple/apple_healthy/image (1).JPG" --n 6
 
     # Single image with fixed methods
-    uv run aug image.jpg --methods Flip Rotate --n 4
+    uv run aug image.jpg --methods Flip,Rotate --n 4
 
     # Single class folder → mode B: fill to --target
     uv run aug data/train/Apple/apple_rust --target 1640
@@ -234,11 +234,13 @@ def augment(
     """Augment input. Mode is decided by the input path type."""
     seed_value = seed if seed >= 0 else None
 
-    try:
-        names = [m.strip() for m in methods.split(",")]
-        fixed = lookup_methods(names) if methods else None
-    except ValueError as exc:
-        raise typer.BadParameter(str(exc)) from exc
+    fixed = None
+    if methods:
+        names = [m.strip() for m in methods.split(",") if m.strip()]
+        try:
+            fixed = lookup_methods(names)
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc)) from exc
 
     if path.is_file():
         _augment_single_image(
