@@ -8,9 +8,8 @@ from plantcv.plantcv.visualize.histogram import (  # type: ignore
     histogram as compute_channel_histogram,
 )
 from transformation.mask import build_mask
-
 from transformation.util import (
-    iter_image_paths,
+    get_image_paths,
     largest_leaf_mask,
     make_output_path,
 )
@@ -115,15 +114,6 @@ def _build_histogram_chart(
     )
 
 
-def build_histogram_chart(image: np.ndarray) -> alt.Chart | None:
-    leaf_mask = largest_leaf_mask(build_mask(image))
-    if leaf_mask is None:
-        return None
-
-    channels = _color_channels(image, leaf_mask)
-    return _build_histogram_chart(leaf_mask, channels)
-
-
 def histogram(
     src: str | Path,
     dst: str | Path,
@@ -132,19 +122,23 @@ def histogram(
     src = Path(src)
     dst = Path(dst)
 
+    image_paths = get_image_paths(src, file)
     saved_paths: list[Path] = []
 
-    for image_path in iter_image_paths(src, file, desc="histogram"):
+    for image_path in image_paths:
         image = cv2.imread(str(image_path))
 
         if image is None:
             print(f"Skipped unreadable image: {image_path}")
             continue
 
-        chart = build_histogram_chart(image)
-        if chart is None:
+        leaf_mask = largest_leaf_mask(build_mask(image))
+        if leaf_mask is None:
             print(f"Skipped image without detected leaf: {image_path}")
             continue
+
+        channels = _color_channels(image, leaf_mask)
+        chart = _build_histogram_chart(leaf_mask, channels)
 
         output_file = make_output_path(
             src, dst, image_path, file, "histogram"
